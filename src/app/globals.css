@@ -1,0 +1,20 @@
+@import "tailwindcss";
+
+/* Page/section titles read as UI chrome, not copyable data — no text-selection cursor
+   blinking mid-word when the user clicks near them. */
+h1, h2, h3 {
+  user-select: none;
+  cursor: default;
+}
+
+@media print {
+  body { margin: 0; }
+  .no-print { display: none !important; }
+}
+
+/* Recharts' accessibility layer makes bars/sectors focusable for keyboard nav, which leaves a
+   default browser focus ring around whatever was last clicked — suppressed since these charts
+   don't have their own drill-down/selection state to indicate. */
+.recharts-wrapper *:focus {
+  outline: none;
+}
