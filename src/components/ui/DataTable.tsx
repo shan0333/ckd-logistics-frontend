@@ -31,6 +31,7 @@ interface DataTableProps<T> {
   headerTextClassName?: string;
   /** Opt-in zebra striping (odd rows tinted) — off by default, same as before. */
   striped?: boolean;
+  testId?: string;
 }
 
 export default function DataTable<T extends Record<string, any>>({
@@ -48,6 +49,7 @@ export default function DataTable<T extends Record<string, any>>({
   headerClassName = 'bg-slate-50',
   headerTextClassName = 'text-slate-600',
   striped = false,
+  testId,
 }: DataTableProps<T>) {
   const totalPages = Math.ceil(totalElements / pageSize);
 
@@ -68,7 +70,7 @@ export default function DataTable<T extends Record<string, any>>({
   const cardRest = cardFieldCols.filter((_, idx) => idx !== primaryIndex);
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-3" data-testid={testId}>
       {/* Table — tablet and up */}
       <div className="hidden md:block overflow-x-auto rounded-lg border border-slate-200">
         <table className="min-w-full divide-y divide-slate-200 text-sm">

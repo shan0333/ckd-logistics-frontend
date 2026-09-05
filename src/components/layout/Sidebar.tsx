@@ -16,10 +16,10 @@ import { useEffect, useState } from 'react';
 import clsx from 'clsx';
 
 const NAV_ITEMS = [
-  { label: 'Dashboard', href: '/dashboard',   icon: RiDashboardLine },
-  { label: 'Shipments', href: '/orgin',       icon: RiTruckLine },
-  { label: 'Receiving', href: '/destination', icon: RiInboxUnarchiveLine },
-  { label: 'Report',    href: '/report',      icon: RiFileChart2Line },
+  { label: 'Dashboard', href: '/dashboard',   icon: RiDashboardLine,      testId: 'nav-dashboard' },
+  { label: 'Shipments', href: '/orgin',       icon: RiTruckLine,          testId: 'nav-orgin' },
+  { label: 'Receiving', href: '/destination', icon: RiInboxUnarchiveLine, testId: 'nav-destination' },
+  { label: 'Report',    href: '/report',      icon: RiFileChart2Line,     testId: 'nav-report' },
 ];
 
 export default function Sidebar() {
@@ -37,10 +37,11 @@ export default function Sidebar() {
 
   const NavLinks = () => (
     <nav className="flex flex-col gap-1 flex-1 px-2 py-4">
-      {NAV_ITEMS.map(({ label, href, icon: Icon }) => (
+      {NAV_ITEMS.map(({ label, href, icon: Icon, testId }) => (
         <Link
           key={href}
           href={href}
+          data-testid={testId}
           onClick={() => setOpen(false)}
           className={clsx(
             'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
@@ -55,6 +56,7 @@ export default function Sidebar() {
       ))}
 
       <button
+        data-testid="nav-logout"
         onClick={handleLogout}
         className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:bg-red-700 hover:text-white transition-colors mt-auto"
       >

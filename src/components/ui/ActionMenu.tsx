@@ -13,9 +13,10 @@ export interface ActionItem {
   hidden?: boolean;
   disabled?: boolean;
   disabledReason?: string;
+  testId?: string;
 }
 
-export default function ActionMenu({ items }: { items: ActionItem[] }) {
+export default function ActionMenu({ items, triggerTestId }: { items: ActionItem[]; triggerTestId?: string }) {
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState({ top: 0, left: 0 });
   const btnRef = useRef<HTMLButtonElement>(null);
@@ -58,6 +59,7 @@ export default function ActionMenu({ items }: { items: ActionItem[] }) {
       <button
         ref={btnRef}
         type="button"
+        data-testid={triggerTestId}
         onClick={() => (open ? setOpen(false) : openMenu())}
         title="Actions"
         className="p-1.5 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors"
@@ -70,10 +72,11 @@ export default function ActionMenu({ items }: { items: ActionItem[] }) {
           style={{ position: 'fixed', top: pos.top, left: pos.left }}
           className="z-50 w-48 bg-white rounded-lg shadow-lg border border-slate-200 py-1"
         >
-          {visible.map(({ label, icon: Icon, onClick, danger, disabled, disabledReason }) => (
+          {visible.map(({ label, icon: Icon, onClick, danger, disabled, disabledReason, testId }) => (
             <button
               key={label}
               type="button"
+              data-testid={testId}
               disabled={disabled}
               title={disabled ? disabledReason : undefined}
               onClick={() => { if (disabled) return; setOpen(false); onClick(); }}

@@ -24,7 +24,7 @@ export default function ReportPage() {
 
   useEffect(() => {
     getTransporterName()
-      .then((res) => setTransporters(res.data ?? []))
+      .then((res) => setTransporters(Array.isArray(res.data) ? res.data : []))
       .catch(() => {});
   }, []);
 
@@ -73,7 +73,7 @@ export default function ReportPage() {
           <div className="flex flex-wrap gap-2">
             {STATUS_OPTIONS.map((s) => (
               <label key={s} className="flex items-center gap-1.5 px-3 py-1.5 border border-slate-300 rounded-lg text-sm cursor-pointer has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50">
-                <input type="checkbox" checked={status.includes(s)} onChange={() => toggle(status, setStatus, s)} />
+                <input type="checkbox" data-testid={`report-status-checkbox-${s}`} checked={status.includes(s)} onChange={() => toggle(status, setStatus, s)} />
                 {s}
               </label>
             ))}
@@ -88,7 +88,7 @@ export default function ReportPage() {
             <div className="flex flex-wrap gap-2 max-h-40 overflow-y-auto">
               {transporters.map((t) => (
                 <label key={t} className="flex items-center gap-1.5 px-3 py-1.5 border border-slate-300 rounded-lg text-sm cursor-pointer has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50">
-                  <input type="checkbox" checked={transName.includes(t)} onChange={() => toggle(transName, setTransName, t)} />
+                  <input type="checkbox" data-testid={`report-transporter-checkbox-${t}`} checked={transName.includes(t)} onChange={() => toggle(transName, setTransName, t)} />
                   {t}
                 </label>
               ))}
@@ -100,27 +100,27 @@ export default function ReportPage() {
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Shipment Date Range (LR Date)</label>
             <div className="flex items-center gap-2">
-              <input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)}
+              <input type="date" value={fromDate} data-testid="report-lrdate-from" onChange={(e) => setFromDate(e.target.value)}
                 className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
               <span className="text-slate-400 text-sm">to</span>
-              <input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)}
+              <input type="date" value={toDate} data-testid="report-lrdate-to" onChange={(e) => setToDate(e.target.value)}
                 className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
             </div>
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Received Date Range (Vehicle Reported)</label>
             <div className="flex items-center gap-2">
-              <input type="date" value={receivedFromDate} onChange={(e) => setReceivedFromDate(e.target.value)}
+              <input type="date" value={receivedFromDate} data-testid="report-receiveddate-from" onChange={(e) => setReceivedFromDate(e.target.value)}
                 className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
               <span className="text-slate-400 text-sm">to</span>
-              <input type="date" value={receivedToDate} onChange={(e) => setReceivedToDate(e.target.value)}
+              <input type="date" value={receivedToDate} data-testid="report-receiveddate-to" onChange={(e) => setReceivedToDate(e.target.value)}
                 className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
             </div>
           </div>
         </div>
 
         <div className="flex justify-end">
-          <button onClick={download}
+          <button data-testid="report-download-button" onClick={download}
             className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700">
             <RiDownload2Line /> Download Excel
           </button>

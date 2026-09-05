@@ -10,6 +10,7 @@ interface Props {
   confirmLabel?: string;
   onConfirm: () => void;
   onCancel: () => void;
+  testId?: string;
 }
 
 export default function ConfirmDialog({
@@ -19,6 +20,7 @@ export default function ConfirmDialog({
   confirmLabel = 'Delete',
   onConfirm,
   onCancel,
+  testId,
 }: Props) {
   useEffect(() => {
     if (!open) return;
@@ -34,6 +36,7 @@ export default function ConfirmDialog({
 
   return (
     <div
+      data-testid={testId}
       style={{
         position: 'fixed', inset: 0, zIndex: 9999,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -95,6 +98,7 @@ export default function ConfirmDialog({
           padding: '20px',
         }}>
           <button
+            data-testid={testId ? `${testId}-cancel` : undefined}
             onClick={onCancel}
             style={{
               padding: '8px 18px', borderRadius: '8px', fontWeight: 600,
@@ -105,6 +109,7 @@ export default function ConfirmDialog({
             Cancel
           </button>
           <button
+            data-testid={testId ? `${testId}-confirm` : undefined}
             onClick={onConfirm}
             style={{
               padding: '8px 18px', borderRadius: '8px', fontWeight: 600,

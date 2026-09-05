@@ -61,7 +61,7 @@ export default function LoginPage() {
 
           <form onSubmit={handleLogin} className="space-y-5" noValidate>
             {loginError && (
-              <div className="flex items-start gap-2.5 px-4 py-3 rounded-xl text-sm bg-red-50 border border-red-200 text-red-600">
+              <div data-testid="login-error-alert" className="flex items-start gap-2.5 px-4 py-3 rounded-xl text-sm bg-red-50 border border-red-200 text-red-600">
                 <RiAlertLine className="w-4 h-4 mt-0.5 shrink-0" />
                 <span>{loginError}</span>
               </div>
@@ -71,7 +71,7 @@ export default function LoginPage() {
               <label className="block text-sm font-semibold text-slate-700">Email</label>
               <div className="relative">
                 <RiUser3Line className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-                <input type="email" value={username} onChange={(e) => setUsername(e.target.value)}
+                <input data-testid="login-email-input" type="email" value={username} onChange={(e) => setUsername(e.target.value)}
                   autoComplete="email" placeholder="Enter email"
                   className="w-full pl-10 pr-4 py-3 rounded-xl text-sm bg-white/70 border border-white/80 focus:outline-none focus:ring-2 focus:ring-blue-500" />
               </div>
@@ -81,7 +81,7 @@ export default function LoginPage() {
               <label className="block text-sm font-semibold text-slate-700">Password</label>
               <div className="relative">
                 <RiLockLine className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-                <input type={showPassword ? 'text' : 'password'} value={password} onChange={(e) => setPassword(e.target.value)}
+                <input data-testid="login-password-input" type={showPassword ? 'text' : 'password'} value={password} onChange={(e) => setPassword(e.target.value)}
                   autoComplete="current-password" placeholder="••••••••"
                   className="w-full pl-10 pr-11 py-3 rounded-xl text-sm bg-white/70 border border-white/80 focus:outline-none focus:ring-2 focus:ring-blue-500" />
                 <button type="button" onClick={() => setShowPassword((v) => !v)} tabIndex={-1}
@@ -91,7 +91,7 @@ export default function LoginPage() {
               </div>
             </div>
 
-            <button type="submit" disabled={loading}
+            <button data-testid="login-submit-button" type="submit" disabled={loading}
               className="w-full flex items-center justify-center gap-2 font-semibold py-3 rounded-xl text-sm text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed transition-colors">
               {loading ? (<><RiLoader4Line className="w-4 h-4 animate-spin" /> Signing in…</>) : 'Sign In'}
             </button>

@@ -122,7 +122,14 @@ export default function DestinationPage() {
       const formData = new FormData();
       formData.append('org', JSON.stringify(payload));
       receiveFiles.forEach((f) => formData.append('files', f));
-      await createOrgin(formData);
+      const res = await createOrgin(formData);
+      // Backend answers 200 even when the update fails, with the error text in `message`.
+      // Treat only the "… Successfully!" messages as an actual save.
+      const msg: string = res?.data?.message ?? '';
+      if (!/success/i.test(msg)) {
+        toast.error(msg || 'Save failed');
+        return;
+      }
       toast.success(submit ? 'Shipment marked received' : 'Saved');
       setReceiveRow(null);
       load();
@@ -161,7 +168,7 @@ export default function DestinationPage() {
     {
       key: 'shipment_no', label: 'Shipment No', sortable: true,
       render: (row) => (
-        <button className="text-blue-600 hover:underline font-medium" onClick={() => setViewRow(row)}>
+        <button data-testid={`destination-row-view-${row.shipment_no}`} className="text-blue-600 hover:underline font-medium" onClick={() => setViewRow(row)}>
           {row.shipment_no}
         </button>
       ),
@@ -176,15 +183,16 @@ export default function DestinationPage() {
     {
       key: 'actions', label: 'Actions',
       render: (row) => (
-        <ActionMenu items={[
-          { label: 'View', icon: RiEyeLine, onClick: () => setViewRow(row) },
+        <ActionMenu triggerTestId={`destination-row-actions-${row.shipment_no}`} items={[
+          { label: 'View', icon: RiEyeLine, onClick: () => setViewRow(row), testId: `destination-row-action-view-${row.shipment_no}` },
           {
             label: isLocked(row) ? (canForceUnlock ? 'Enable Edit' : 'Locked') : 'Receive',
             icon: RiInboxUnarchiveLine,
             hidden: isLocked(row) && !canForceUnlock,
             onClick: () => openReceive(row),
+            testId: isLocked(row) ? `destination-enable-edit-button-${row.shipment_no}` : `destination-receive-button-${row.shipment_no}`,
           },
-          { label: 'Images', icon: RiImageLine, onClick: () => openImages(row) },
+          { label: 'Images', icon: RiImageLine, onClick: () => openImages(row), testId: `destination-row-action-images-${row.shipment_no}` },
         ]} />
       ),
     },
@@ -198,6 +206,7 @@ export default function DestinationPage() {
       {spinning && <Spinner fullScreen />}
 
       <ConfirmDialog
+        testId="destination-submit-confirm"
         open={confirmSubmit}
         title="Submit Shipment"
         message="Once submitted, this record can't be edited again (unless an admin re-enables it). Continue?"
@@ -218,22 +227,22 @@ export default function DestinationPage() {
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="relative flex-1">
             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">🔍</span>
-            <input type="text" value={search}
+            <input type="text" value={search} data-testid="destination-search-input"
               onChange={e => { setSearch(e.target.value); setPage(0); }}
               placeholder="Search by shipment no, transporter or vehicle…"
               className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent" />
           </div>
           <div className="flex gap-2 items-center">
-            <input type="date" value={fromDate} onChange={(e) => { setFromDate(e.target.value); setPage(0); }}
+            <input type="date" value={fromDate} data-testid="destination-date-from" onChange={(e) => { setFromDate(e.target.value); setPage(0); }}
               className="px-3 py-2.5 border border-gray-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400" />
             <span className="text-slate-400 text-sm">to</span>
-            <input type="date" value={toDate} onChange={(e) => { setToDate(e.target.value); setPage(0); }}
+            <input type="date" value={toDate} data-testid="destination-date-to" onChange={(e) => { setToDate(e.target.value); setPage(0); }}
               className="px-3 py-2.5 border border-gray-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400" />
           </div>
         </div>
         <div className="flex gap-1 flex-wrap">
           {STATUS_PILLS.map(f => (
-            <button key={f.value} onClick={() => { setStatusFilter(f.value); setPage(0); }}
+            <button key={f.value} data-testid={`destination-status-pill-${f.value || 'ALL'}`} onClick={() => { setStatusFilter(f.value); setPage(0); }}
               className={`px-3.5 py-2 rounded-xl text-xs font-semibold transition-colors ${
                 statusFilter === f.value
                   ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-200'
@@ -246,14 +255,14 @@ export default function DestinationPage() {
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 md:p-6 overflow-x-auto">
-        <DataTable columns={cols} data={paged} totalElements={filtered.length} page={page}
+        <DataTable testId="destination-table" columns={cols} data={paged} totalElements={filtered.length} page={page}
           pageSize={pageSize} sortColumn="" sortMode="" loading={loading}
           onPageChange={p => setPage(p)} onSort={() => {}}
           onPageSizeChange={(n) => { setPageSize(n); setPage(0); }} />
       </div>
 
       {/* View details */}
-      <Modal open={!!viewRow} onClose={() => setViewRow(null)} title={`Shipment ${viewRow?.shipment_no ?? ''}`} size="lg">
+      <Modal testId="destination-view-modal" open={!!viewRow} onClose={() => setViewRow(null)} title={`Shipment ${viewRow?.shipment_no ?? ''}`} size="lg">
         {viewRow && (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-sm">
             {[
@@ -278,7 +287,7 @@ export default function DestinationPage() {
       </Modal>
 
       {/* Receive */}
-      <Modal open={!!receiveRow} onClose={() => setReceiveRow(null)}
+      <Modal testId="destination-receive-modal" open={!!receiveRow} onClose={() => setReceiveRow(null)}
         title={`Receive — ${receiveRow?.shipment_no ?? ''}`} size="lg">
         {receiveRow && (
           <div className="flex flex-col gap-4">
@@ -286,19 +295,19 @@ export default function DestinationPage() {
               <div className="px-3 py-2 rounded-lg bg-amber-50 border border-amber-200 text-amber-700 text-sm flex items-center justify-between">
                 <span>This shipment has already been submitted and is locked.</span>
                 {canForceUnlock && (
-                  <button onClick={() => setUnlocked(true)} className="font-semibold underline shrink-0 ml-3">Enable Edit</button>
+                  <button data-testid="destination-enable-edit-button" onClick={() => setUnlocked(true)} className="font-semibold underline shrink-0 ml-3">Enable Edit</button>
                 )}
               </div>
             )}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Vehicle Reported On</label>
-                <input type="date" disabled={formLocked} className={SEL} value={receiveForm.vehicle_reported_on}
+                <input type="date" data-testid="destination-modal-vehicle-reported-on-input" disabled={formLocked} className={SEL} value={receiveForm.vehicle_reported_on}
                   onChange={e => setReceiveForm(p => ({ ...p, vehicle_reported_on: e.target.value }))} />
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Delay Applicable</label>
-                <select disabled={formLocked} className={SEL} value={receiveForm.delay_applicable_or_not}
+                <select data-testid="destination-modal-delay-select" disabled={formLocked} className={SEL} value={receiveForm.delay_applicable_or_not}
                   onChange={e => setReceiveForm(p => ({ ...p, delay_applicable_or_not: e.target.value as 'Y' | 'N' }))}>
                   <option value="N">No</option>
                   <option value="Y">Yes</option>
@@ -306,7 +315,7 @@ export default function DestinationPage() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Fast Mode Applicable</label>
-                <select disabled={formLocked} className={SEL} value={receiveForm.fast_mode_applicable_or_not}
+                <select data-testid="destination-modal-fastmode-select" disabled={formLocked} className={SEL} value={receiveForm.fast_mode_applicable_or_not}
                   onChange={e => setReceiveForm(p => ({ ...p, fast_mode_applicable_or_not: e.target.value as 'Y' | 'N' }))}>
                   <option value="N">No</option>
                   <option value="Y">Yes</option>
@@ -314,7 +323,7 @@ export default function DestinationPage() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">ODC</label>
-                <select disabled={formLocked} className={SEL} value={receiveForm.odc}
+                <select data-testid="destination-modal-odc-select" disabled={formLocked} className={SEL} value={receiveForm.odc}
                   onChange={e => setReceiveForm(p => ({ ...p, odc: e.target.value as 'Y' | 'N' }))}>
                   <option value="N">No</option>
                   <option value="Y">Yes</option>
@@ -322,7 +331,7 @@ export default function DestinationPage() {
               </div>
               <div className="sm:col-span-2">
                 <label className="block text-sm font-medium text-slate-700 mb-1">Attach Images</label>
-                <input type="file" multiple accept="image/*" disabled={formLocked} className={SEL + ' cursor-pointer'}
+                <input type="file" multiple accept="image/*" data-testid="destination-modal-images-input" disabled={formLocked} className={SEL + ' cursor-pointer'}
                   onChange={e => setReceiveFiles(Array.from(e.target.files ?? []))} />
                 {receiveFiles.length > 0 && (
                   <p className="text-xs text-slate-500 mt-1">{receiveFiles.length} file(s) selected</p>
@@ -332,9 +341,9 @@ export default function DestinationPage() {
             <div className="flex justify-end gap-3 mt-2">
               <button onClick={() => setReceiveRow(null)}
                 className="px-4 py-2 border border-slate-300 text-slate-700 text-sm font-semibold rounded-lg hover:bg-slate-50">Cancel</button>
-              <button onClick={() => doSave(false)} disabled={formLocked}
+              <button data-testid="destination-save-button" onClick={() => doSave(false)} disabled={formLocked}
                 className="px-4 py-2 border border-blue-600 text-blue-600 text-sm font-semibold rounded-lg hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed">Save</button>
-              <button onClick={() => setConfirmSubmit(true)} disabled={formLocked}
+              <button data-testid="destination-submit-button" onClick={() => setConfirmSubmit(true)} disabled={formLocked}
                 className="px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed">Submit</button>
             </div>
           </div>
@@ -344,13 +353,13 @@ export default function DestinationPage() {
       {/* Images — note: the backend's getImageList only filters by category when flag is
           exactly "ORGIN" (see OrginController.getImageList); passing "DEST" here returns every
           image on the shipment regardless of category, matching the legacy app's own behavior. */}
-      <Modal open={!!imageShipment} onClose={() => setImageShipment(null)} title={`Images — ${imageShipment ?? ''}`} size="lg">
+      <Modal testId="destination-images-modal" open={!!imageShipment} onClose={() => setImageShipment(null)} title={`Images — ${imageShipment ?? ''}`} size="lg">
         {loadingImages ? (
           <div className="py-10 text-center text-slate-400 text-sm">Loading…</div>
         ) : images.length === 0 ? (
-          <div className="py-10 text-center text-slate-400 text-sm">No images uploaded for this shipment.</div>
+          <div data-testid="destination-images-modal-empty-state" className="py-10 text-center text-slate-400 text-sm">No images uploaded for this shipment.</div>
         ) : (
-          <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+          <div data-testid="destination-images-modal-grid" className="grid grid-cols-3 sm:grid-cols-4 gap-2">
             {images.map((img) => (
               <button key={img.id} onClick={() => window.open(img.s3_url, '_blank', 'noopener,noreferrer')}
                 className="relative aspect-square rounded-lg overflow-hidden border border-slate-200 hover:opacity-80">

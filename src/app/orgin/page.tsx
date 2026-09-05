@@ -84,7 +84,8 @@ export default function OrginPage() {
   // becomes Route To. No fixed location (locId null, HQ/admin) sees every location in both.
   useEffect(() => {
     getLocationList().then((res) => {
-      const raw: Location[] = res.data?.data ?? res.data ?? [];
+      const nested = res.data?.data;
+      const raw: Location[] = Array.isArray(nested) ? nested : Array.isArray(res.data) ? res.data : [];
       const list = raw.filter((l) => l.name !== 'Logistics');
       if (locId == null) {
         setRouteFrom(list);
@@ -113,8 +114,10 @@ export default function OrginPage() {
 
   const loadDropdowns = async () => {
     const [cu, vt] = await Promise.all([getOrginCustomer(), getVehicletype()]);
-    setCustomers(cu.data ?? []);
-    setVehicleTypes(vt.data ?? []);
+    // A category with no rows yet gets back a 204 with an empty-string body, not null/undefined
+    // — plain `?? []` doesn't catch that, so guard on Array.isArray instead.
+    setCustomers(Array.isArray(cu.data) ? cu.data : []);
+    setVehicleTypes(Array.isArray(vt.data) ? vt.data : []);
   };
 
   const openCreate = async () => {
@@ -148,7 +151,15 @@ export default function OrginPage() {
       const formData = new FormData();
       formData.append('org', JSON.stringify(payload));
       files.forEach((f) => formData.append('files', f));
-      await createOrgin(formData);
+      const res = await createOrgin(formData);
+      // The backend returns HTTP 200 even on a failed insert, putting the DB/exception
+      // text in `message` (data stays null on success too, so it's not a usable signal).
+      // Only CREATE_MESSAGE/UPDATE_MESSAGE ("… Successfully!") mean it actually saved.
+      const msg: string = res?.data?.message ?? '';
+      if (!/success/i.test(msg)) {
+        toast.error(msg || 'Save failed');
+        return;
+      }
       toast.success('Shipment saved');
       setShowModal(false);
       load();
@@ -199,7 +210,7 @@ export default function OrginPage() {
     {
       key: 'shipment_no', label: 'Shipment No', sortable: true,
       render: (row) => (
-        <button className="text-blue-600 hover:underline font-medium" onClick={() => setViewRow(row)}>
+        <button data-testid={`orgin-row-view-${row.shipment_no}`} className="text-blue-600 hover:underline font-medium" onClick={() => setViewRow(row)}>
           {row.shipment_no}
         </button>
       ),
@@ -217,10 +228,10 @@ export default function OrginPage() {
     {
       key: 'actions', label: 'Actions',
       render: (row) => (
-        <ActionMenu items={[
-          { label: 'View', icon: RiEyeLine, onClick: () => setViewRow(row) },
-          { label: 'Images', icon: RiImageLine, onClick: () => openImages(row) },
-          { label: 'Delete', icon: RiDeleteBinLine, danger: true, hidden: !admin, onClick: () => setConfirmRow(row) },
+        <ActionMenu triggerTestId={`orgin-row-actions-${row.shipment_no}`} items={[
+          { label: 'View', icon: RiEyeLine, onClick: () => setViewRow(row), testId: `orgin-row-action-view-${row.shipment_no}` },
+          { label: 'Images', icon: RiImageLine, onClick: () => openImages(row), testId: `orgin-row-action-images-${row.shipment_no}` },
+          { label: 'Delete', icon: RiDeleteBinLine, danger: true, hidden: !admin, onClick: () => setConfirmRow(row), testId: `orgin-row-delete-${row.shipment_no}` },
         ]} />
       ),
     },
@@ -232,6 +243,7 @@ export default function OrginPage() {
     <div>
       {spinning && <Spinner fullScreen />}
       <ConfirmDialog
+        testId="orgin-delete-confirm"
         open={!!confirmRow}
         title="Delete Shipment"
         message={`Delete shipment "${confirmRow?.shipment_no}"? This cannot be undone.`}
@@ -245,7 +257,7 @@ export default function OrginPage() {
           <h1 className="text-2xl font-bold text-gray-900">Shipments</h1>
           <p className="text-sm text-gray-500 mt-0.5">{filtered.length} of {all.length} records</p>
         </div>
-        <button onClick={openCreate}
+        <button data-testid="orgin-new-shipment-button" onClick={openCreate}
           className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg text-sm font-medium flex items-center justify-center gap-2">
           <RiAddLine /> New Shipment
         </button>
@@ -256,22 +268,22 @@ export default function OrginPage() {
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="relative flex-1">
             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">🔍</span>
-            <input type="text" value={search}
+            <input type="text" value={search} data-testid="orgin-search-input"
               onChange={e => { setSearch(e.target.value); setPage(0); }}
               placeholder="Search by shipment no, transporter or vehicle…"
               className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent" />
           </div>
           <div className="flex gap-2 items-center">
-            <input type="date" value={fromDate} onChange={(e) => { setFromDate(e.target.value); setPage(0); }}
+            <input type="date" value={fromDate} data-testid="orgin-date-from" onChange={(e) => { setFromDate(e.target.value); setPage(0); }}
               className="px-3 py-2.5 border border-gray-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400" />
             <span className="text-slate-400 text-sm">to</span>
-            <input type="date" value={toDate} onChange={(e) => { setToDate(e.target.value); setPage(0); }}
+            <input type="date" value={toDate} data-testid="orgin-date-to" onChange={(e) => { setToDate(e.target.value); setPage(0); }}
               className="px-3 py-2.5 border border-gray-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400" />
           </div>
         </div>
         <div className="flex gap-1 flex-wrap">
           {STATUS_PILLS.map(f => (
-            <button key={f.value} onClick={() => { setStatusFilter(f.value); setPage(0); }}
+            <button key={f.value} data-testid={`orgin-status-pill-${f.value || 'ALL'}`} onClick={() => { setStatusFilter(f.value); setPage(0); }}
               className={`px-3.5 py-2 rounded-xl text-xs font-semibold transition-colors ${
                 statusFilter === f.value
                   ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-200'
@@ -284,92 +296,92 @@ export default function OrginPage() {
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 md:p-6 overflow-x-auto">
-        <DataTable columns={cols} data={paged} totalElements={filtered.length} page={page}
+        <DataTable testId="orgin-table" columns={cols} data={paged} totalElements={filtered.length} page={page}
           pageSize={pageSize} sortColumn="" sortMode="" loading={loading}
           onPageChange={p => setPage(p)} onSort={() => {}}
           onPageSizeChange={(n) => { setPageSize(n); setPage(0); }} />
       </div>
 
       {/* Create */}
-      <Modal open={showModal} onClose={() => setShowModal(false)} title="New Shipment" size="xl">
+      <Modal testId="orgin-new-shipment-modal" open={showModal} onClose={() => setShowModal(false)} title="New Shipment" size="xl">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Customer</label>
-            <select className={SEL} value={org.customer_id} onChange={e => setOrg(p => ({ ...p, customer_id: e.target.value }))}>
+            <select data-testid="orgin-modal-customer-select" className={SEL} value={org.customer_id} onChange={e => setOrg(p => ({ ...p, customer_id: e.target.value }))}>
               <option value="">Select customer</option>
               {customers.map((c) => <option key={c.id} value={c.id}>{c.data}</option>)}
             </select>
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Vehicle Type</label>
-            <select className={SEL} value={org.vehicle_type} onChange={e => setOrg(p => ({ ...p, vehicle_type: e.target.value }))}>
+            <select data-testid="orgin-modal-vehicletype-select" className={SEL} value={org.vehicle_type} onChange={e => setOrg(p => ({ ...p, vehicle_type: e.target.value }))}>
               <option value="">Select type</option>
               {vehicleTypes.map((v) => <option key={v.id} value={v.id}>{v.data}</option>)}
             </select>
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Route From</label>
-            <select className={SEL} value={org.shipment_route_from_id} onChange={e => setOrg(p => ({ ...p, shipment_route_from_id: e.target.value }))}>
+            <select data-testid="orgin-modal-route-from-select" className={SEL} value={org.shipment_route_from_id} onChange={e => setOrg(p => ({ ...p, shipment_route_from_id: e.target.value }))}>
               <option value="">Select origin</option>
               {routeFrom.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
             </select>
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Route To</label>
-            <select className={SEL} value={org.shipment_route_to_id} onChange={e => setOrg(p => ({ ...p, shipment_route_to_id: e.target.value }))}>
+            <select data-testid="orgin-modal-route-to-select" className={SEL} value={org.shipment_route_to_id} onChange={e => setOrg(p => ({ ...p, shipment_route_to_id: e.target.value }))}>
               <option value="">Select destination</option>
               {routeTo.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
             </select>
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Shipment No</label>
-            <input className={SEL + (dupWarning ? ' border-red-400' : '')} value={org.shipment_no ?? ''}
+            <input data-testid="orgin-modal-shipment-no-input" className={SEL + (dupWarning ? ' border-red-400' : '')} value={org.shipment_no ?? ''}
               onBlur={checkDup}
               onChange={e => { setOrg(p => ({ ...p, shipment_no: e.target.value })); setDupWarning(false); }} />
-            {dupWarning && <p className="text-xs text-red-600 mt-1">This Shipment No already exists.</p>}
+            {dupWarning && <p data-testid="orgin-modal-shipment-no-dupwarning" className="text-xs text-red-600 mt-1">This Shipment No already exists.</p>}
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Vehicle No</label>
-            <input className={SEL} value={org.vehicle_no ?? ''}
+            <input data-testid="orgin-modal-vehicle-no-input" className={SEL} value={org.vehicle_no ?? ''}
               onChange={e => setOrg(p => ({ ...p, vehicle_no: e.target.value }))} />
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">LR No</label>
-            <input className={SEL} value={org.lr_no ?? ''}
+            <input data-testid="orgin-modal-lr-no-input" className={SEL} value={org.lr_no ?? ''}
               onChange={e => setOrg(p => ({ ...p, lr_no: e.target.value }))} />
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Transporter</label>
-            <input className={SEL} value={org.transporter_name ?? ''}
+            <input data-testid="orgin-modal-transporter-input" className={SEL} value={org.transporter_name ?? ''}
               onChange={e => setOrg(p => ({ ...p, transporter_name: e.target.value }))} />
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Transit Days</label>
-            <input className={SEL} value={org.transit_days ?? ''}
+            <input data-testid="orgin-modal-transit-days-input" className={SEL} value={org.transit_days ?? ''}
               onChange={e => setOrg(p => ({ ...p, transit_days: e.target.value }))} />
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">LR Date</label>
-            <input type="date" className={SEL} value={org.lr_date ?? ''}
+            <input type="date" data-testid="orgin-modal-lr-date-input" className={SEL} value={org.lr_date ?? ''}
               onChange={e => setOrg(p => ({ ...p, lr_date: e.target.value }))} />
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Fast Mode</label>
-            <select className={SEL} value={org.fast_mode} onChange={e => setOrg(p => ({ ...p, fast_mode: e.target.value as 'Y' | 'N' }))}>
+            <select data-testid="orgin-modal-fastmode-select" className={SEL} value={org.fast_mode} onChange={e => setOrg(p => ({ ...p, fast_mode: e.target.value as 'Y' | 'N' }))}>
               <option value="N">No</option>
               <option value="Y">Yes</option>
             </select>
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">ODC</label>
-            <select className={SEL} value={org.odc} onChange={e => setOrg(p => ({ ...p, odc: e.target.value as 'Y' | 'N' }))}>
+            <select data-testid="orgin-modal-odc-select" className={SEL} value={org.odc} onChange={e => setOrg(p => ({ ...p, odc: e.target.value as 'Y' | 'N' }))}>
               <option value="N">No</option>
               <option value="Y">Yes</option>
             </select>
           </div>
           <div className="sm:col-span-2">
             <label className="block text-sm font-medium text-slate-700 mb-1">Attach Images</label>
-            <input type="file" multiple accept="image/*" className={SEL + ' cursor-pointer'}
+            <input type="file" multiple accept="image/*" data-testid="orgin-modal-images-input" className={SEL + ' cursor-pointer'}
               onChange={e => setFiles(Array.from(e.target.files ?? []))} />
             {files.length > 0 && (
               <p className="text-xs text-slate-500 mt-1">{files.length} file(s) selected</p>
@@ -379,7 +391,7 @@ export default function OrginPage() {
         <div className="flex justify-end gap-3 mt-6">
           <button onClick={() => setShowModal(false)}
             className="px-4 py-2 border border-slate-300 text-slate-700 text-sm font-semibold rounded-lg hover:bg-slate-50">Cancel</button>
-          <button onClick={save}
+          <button data-testid="orgin-modal-save-button" onClick={save}
             className="px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700">Save Shipment</button>
         </div>
       </Modal>
@@ -388,7 +400,7 @@ export default function OrginPage() {
           exposed here: the backend's UPDATE_ORGIN only ever updates the receiving-side fields
           (fast mode, delay, ODC, vehicle-reported-on, status) via the Destination/receive
           workflow, not the fields set at creation — an edit form for those would silently no-op. */}
-      <Modal open={!!viewRow} onClose={() => setViewRow(null)} title={`Shipment ${viewRow?.shipment_no ?? ''}`} size="lg">
+      <Modal testId="orgin-view-modal" open={!!viewRow} onClose={() => setViewRow(null)} title={`Shipment ${viewRow?.shipment_no ?? ''}`} size="lg">
         {viewRow && (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-sm">
             {[
@@ -411,13 +423,13 @@ export default function OrginPage() {
       </Modal>
 
       {/* Images */}
-      <Modal open={!!imageShipment} onClose={() => setImageShipment(null)} title={`Images — ${imageShipment ?? ''}`} size="lg">
+      <Modal testId="orgin-images-modal" open={!!imageShipment} onClose={() => setImageShipment(null)} title={`Images — ${imageShipment ?? ''}`} size="lg">
         {loadingImages ? (
           <div className="py-10 text-center text-slate-400 text-sm">Loading…</div>
         ) : images.length === 0 ? (
-          <div className="py-10 text-center text-slate-400 text-sm">No images uploaded for this shipment.</div>
+          <div data-testid="orgin-images-modal-empty-state" className="py-10 text-center text-slate-400 text-sm">No images uploaded for this shipment.</div>
         ) : (
-          <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+          <div data-testid="orgin-images-modal-grid" className="grid grid-cols-3 sm:grid-cols-4 gap-2">
             {images.map((img) => (
               <button key={img.id} onClick={() => window.open(img.s3_url, '_blank', 'noopener,noreferrer')}
                 className="relative aspect-square rounded-lg overflow-hidden border border-slate-200 hover:opacity-80">
