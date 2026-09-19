@@ -136,6 +136,8 @@ export default function OrginPage() {
     } catch { /* best-effort — don't block on a failed check */ }
   };
 
+  const odcDocMissing = org.odc === 'Y' && files.length === 0;
+
   const save = async () => {
     if (!org.customer_id) { toast.error('Customer is required'); return; }
     if (!org.shipment_route_from_id) { toast.error('Route From is required'); return; }
@@ -395,13 +397,19 @@ export default function OrginPage() {
             {files.length > 0 && (
               <p className="text-xs text-slate-500 mt-1">{files.length} file(s) selected</p>
             )}
+            {odcDocMissing && (
+              <p data-testid="orgin-modal-odc-doc-error" className="text-xs text-red-600 mt-1">
+                ODC document must be attached before this shipment can be saved.
+              </p>
+            )}
           </div>
         </div>
         <div className="flex justify-end gap-3 mt-6">
           <button onClick={() => setShowModal(false)}
             className="px-4 py-2 border border-slate-300 text-slate-700 text-sm font-semibold rounded-lg hover:bg-slate-50">Cancel</button>
-          <button data-testid="orgin-modal-save-button" onClick={save}
-            className="px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700">Save Shipment</button>
+          <button data-testid="orgin-modal-save-button" onClick={save} disabled={odcDocMissing}
+            title={odcDocMissing ? 'ODC document must be attached before this shipment can be saved' : undefined}
+            className="px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-blue-600">Save Shipment</button>
         </div>
       </Modal>
 
