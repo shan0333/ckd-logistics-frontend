@@ -192,7 +192,9 @@ export default function DestinationPage() {
   };
 
   const cols: Column<Orgin>[] = [
-    { key: 'id', label: '#', width: '50px' },
+    // Serial number by position (continues across pages), not the DB id — ids skip and
+    // reflect insert order, which reads as a broken sequence in the table.
+    { key: 'sno', label: '#', width: '50px', render: (row) => page * pageSize + paged.indexOf(row) + 1 },
     {
       key: 'shipment_no', label: 'Shipment No', sortable: true,
       render: (row) => (
