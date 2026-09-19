@@ -136,7 +136,10 @@ export default function OrginPage() {
     } catch { /* best-effort — don't block on a failed check */ }
   };
 
-  const odcDocMissing = org.odc === 'Y' && files.length === 0;
+  // ODC document is mandatory for every new shipment, not just ODC='Y' ones — a placeholder
+  // image attached just to get past this check still satisfies it (the backend has no way to
+  // verify content), but at least one attachment must always be present.
+  const odcDocMissing = files.length === 0;
 
   const save = async () => {
     if (!org.customer_id) { toast.error('Customer is required'); return; }
@@ -147,11 +150,8 @@ export default function OrginPage() {
     if (!org.lr_date) { toast.error('LR Date is required'); return; }
     if (!org.transporter_name?.trim()) { toast.error('Transporter is required'); return; }
     if (dupWarning) { toast.error('This Shipment No already exists'); return; }
-    // ODC (Over Dimensional Cargo) shipments need proof on file before they can move — a
-    // placeholder image attached just to get past this check still satisfies it (the backend
-    // has no way to verify content), but at least one attachment must be present.
-    if (org.odc === 'Y' && files.length === 0) {
-      toast.error('ODC document is required when ODC is set to Yes');
+    if (odcDocMissing) {
+      toast.error('ODC document is required');
       return;
     }
     setSpinning(true);
@@ -390,7 +390,7 @@ export default function OrginPage() {
           </div>
           <div className="sm:col-span-2">
             <label className="block text-sm font-medium text-slate-700 mb-1">
-              Attach Images{org.odc === 'Y' && <span className="text-red-500"> * (ODC document required)</span>}
+              Attach Images<span className="text-red-500"> * (ODC document required)</span>
             </label>
             <input type="file" multiple accept="image/*" data-testid="orgin-modal-images-input" className={SEL + ' cursor-pointer'}
               onChange={e => setFiles(Array.from(e.target.files ?? []))} />

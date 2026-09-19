@@ -120,9 +120,14 @@ export default function DestinationPage() {
     }
   };
 
+  // Document is mandatory for every shipment on final Submit, not just ODC='Y' ones — matches
+  // the same unconditional rule on the Origin (creation) page. Not enforced on the intermediate
+  // Save (draft/Work-in-Progress), only on Submit which locks the record.
+  const receiveDocMissing = existingReceiveImageCount + receiveFiles.length === 0;
+
   const handleSubmitClick = () => {
-    if (receiveForm.odc === 'Y' && existingReceiveImageCount + receiveFiles.length === 0) {
-      toast.error('ODC document is required when ODC is set to Yes');
+    if (receiveDocMissing) {
+      toast.error('ODC document is required');
       return;
     }
     setConfirmSubmit(true);
@@ -130,8 +135,8 @@ export default function DestinationPage() {
 
   const doSave = async (submit: boolean) => {
     if (!receiveRow) return;
-    if (submit && receiveForm.odc === 'Y' && existingReceiveImageCount + receiveFiles.length === 0) {
-      toast.error('ODC document is required when ODC is set to Yes');
+    if (submit && receiveDocMissing) {
+      toast.error('ODC document is required');
       return;
     }
     setSpinning(true);
@@ -354,7 +359,7 @@ export default function DestinationPage() {
               </div>
               <div className="sm:col-span-2">
                 <label className="block text-sm font-medium text-slate-700 mb-1">
-                  Attach Images{receiveForm.odc === 'Y' && <span className="text-red-500"> * (ODC document required)</span>}
+                  Attach Images<span className="text-red-500"> * (ODC document required)</span>
                 </label>
                 <input type="file" multiple accept="image/*" data-testid="destination-modal-images-input" disabled={formLocked} className={SEL + ' cursor-pointer'}
                   onChange={e => setReceiveFiles(Array.from(e.target.files ?? []))} />
@@ -364,6 +369,11 @@ export default function DestinationPage() {
                 {receiveFiles.length === 0 && existingReceiveImageCount > 0 && (
                   <p className="text-xs text-slate-500 mt-1">{existingReceiveImageCount} photo(s) already on file</p>
                 )}
+                {receiveDocMissing && (
+                  <p data-testid="destination-modal-odc-doc-error" className="text-xs text-red-600 mt-1">
+                    ODC document must be attached before this shipment can be submitted.
+                  </p>
+                )}
               </div>
             </div>
             <div className="flex justify-end gap-3 mt-2">
@@ -371,7 +381,8 @@ export default function DestinationPage() {
                 className="px-4 py-2 border border-slate-300 text-slate-700 text-sm font-semibold rounded-lg hover:bg-slate-50">Cancel</button>
               <button data-testid="destination-save-button" onClick={() => doSave(false)} disabled={formLocked}
                 className="px-4 py-2 border border-blue-600 text-blue-600 text-sm font-semibold rounded-lg hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed">Save</button>
-              <button data-testid="destination-submit-button" onClick={handleSubmitClick} disabled={formLocked}
+              <button data-testid="destination-submit-button" onClick={handleSubmitClick} disabled={formLocked || receiveDocMissing}
+                title={receiveDocMissing ? 'ODC document must be attached before this shipment can be submitted' : undefined}
                 className="px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed">Submit</button>
             </div>
           </div>
