@@ -145,6 +145,13 @@ export default function OrginPage() {
     if (!org.lr_date) { toast.error('LR Date is required'); return; }
     if (!org.transporter_name?.trim()) { toast.error('Transporter is required'); return; }
     if (dupWarning) { toast.error('This Shipment No already exists'); return; }
+    // ODC (Over Dimensional Cargo) shipments need proof on file before they can move — a
+    // placeholder image attached just to get past this check still satisfies it (the backend
+    // has no way to verify content), but at least one attachment must be present.
+    if (org.odc === 'Y' && files.length === 0) {
+      toast.error('ODC document is required when ODC is set to Yes');
+      return;
+    }
     setSpinning(true);
     try {
       const payload: Orgin = { ...org, isfastflag: org.fast_mode === 'Y' };
@@ -380,7 +387,9 @@ export default function OrginPage() {
             </select>
           </div>
           <div className="sm:col-span-2">
-            <label className="block text-sm font-medium text-slate-700 mb-1">Attach Images</label>
+            <label className="block text-sm font-medium text-slate-700 mb-1">
+              Attach Images{org.odc === 'Y' && <span className="text-red-500"> * (ODC document required)</span>}
+            </label>
             <input type="file" multiple accept="image/*" data-testid="orgin-modal-images-input" className={SEL + ' cursor-pointer'}
               onChange={e => setFiles(Array.from(e.target.files ?? []))} />
             {files.length > 0 && (

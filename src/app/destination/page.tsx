@@ -57,6 +57,10 @@ export default function DestinationPage() {
   const [receiveRow, setReceiveRow] = useState<Orgin | null>(null);
   const [receiveForm, setReceiveForm] = useState({ ...EMPTY_RECEIVE });
   const [receiveFiles, setReceiveFiles] = useState<File[]>([]);
+  // Photos already on file for this shipment (from an earlier Save) count toward the ODC
+  // mandatory-doc check on Submit — receiveFiles alone would only see files picked in this
+  // session and wrongly block a Submit that has no new files to add.
+  const [existingReceiveImageCount, setExistingReceiveImageCount] = useState(0);
   const [unlocked, setUnlocked] = useState(false);
   const [confirmSubmit, setConfirmSubmit] = useState(false);
   const locId = getLocId();
@@ -97,7 +101,7 @@ export default function DestinationPage() {
 
   const isLocked = (row: Orgin) => row.org_status === 'S';
 
-  const openReceive = (row: Orgin) => {
+  const openReceive = async (row: Orgin) => {
     setReceiveRow(row);
     setReceiveForm({
       vehicle_reported_on: row.vehicle_reported_on ?? '',
@@ -106,11 +110,30 @@ export default function DestinationPage() {
       odc: (row.odc as 'Y' | 'N') ?? 'N',
     });
     setReceiveFiles([]);
+    setExistingReceiveImageCount(0);
     setUnlocked(false);
+    if (row.shipment_no) {
+      try {
+        const res = await getOrginImages(row.shipment_no, 'DEST');
+        setExistingReceiveImageCount((res.data?.data ?? []).length);
+      } catch { /* best-effort — worst case Submit asks for a file that's already on file */ }
+    }
+  };
+
+  const handleSubmitClick = () => {
+    if (receiveForm.odc === 'Y' && existingReceiveImageCount + receiveFiles.length === 0) {
+      toast.error('ODC document is required when ODC is set to Yes');
+      return;
+    }
+    setConfirmSubmit(true);
   };
 
   const doSave = async (submit: boolean) => {
     if (!receiveRow) return;
+    if (submit && receiveForm.odc === 'Y' && existingReceiveImageCount + receiveFiles.length === 0) {
+      toast.error('ODC document is required when ODC is set to Yes');
+      return;
+    }
     setSpinning(true);
     try {
       const payload: Orgin = {
@@ -330,11 +353,16 @@ export default function DestinationPage() {
                 </select>
               </div>
               <div className="sm:col-span-2">
-                <label className="block text-sm font-medium text-slate-700 mb-1">Attach Images</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Attach Images{receiveForm.odc === 'Y' && <span className="text-red-500"> * (ODC document required)</span>}
+                </label>
                 <input type="file" multiple accept="image/*" data-testid="destination-modal-images-input" disabled={formLocked} className={SEL + ' cursor-pointer'}
                   onChange={e => setReceiveFiles(Array.from(e.target.files ?? []))} />
                 {receiveFiles.length > 0 && (
                   <p className="text-xs text-slate-500 mt-1">{receiveFiles.length} file(s) selected</p>
+                )}
+                {receiveFiles.length === 0 && existingReceiveImageCount > 0 && (
+                  <p className="text-xs text-slate-500 mt-1">{existingReceiveImageCount} photo(s) already on file</p>
                 )}
               </div>
             </div>
@@ -343,7 +371,7 @@ export default function DestinationPage() {
                 className="px-4 py-2 border border-slate-300 text-slate-700 text-sm font-semibold rounded-lg hover:bg-slate-50">Cancel</button>
               <button data-testid="destination-save-button" onClick={() => doSave(false)} disabled={formLocked}
                 className="px-4 py-2 border border-blue-600 text-blue-600 text-sm font-semibold rounded-lg hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed">Save</button>
-              <button data-testid="destination-submit-button" onClick={() => setConfirmSubmit(true)} disabled={formLocked}
+              <button data-testid="destination-submit-button" onClick={handleSubmitClick} disabled={formLocked}
                 className="px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed">Submit</button>
             </div>
           </div>
