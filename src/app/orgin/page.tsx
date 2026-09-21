@@ -15,10 +15,6 @@ import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { RiAddLine, RiDeleteBinLine, RiImageLine, RiEyeLine } from 'react-icons/ri';
 import { isAdmin, getLocId } from '@/lib/auth';
 
-// TEMPORARY (testing): while true, no new shipment can be saved from this form even with the
-// ODC document attached. Set to false to go back to the normal "doc attached => can save" rule.
-const SHIPMENT_CREATION_BLOCKED = true;
-
 const EMPTY_ORG: Orgin = {
   shipment_no: '', vehicle_no: '', lr_no: '', lr_date: '',
   transporter_name: '', transit_days: '', fast_mode: 'N',
@@ -144,13 +140,8 @@ export default function OrginPage() {
   // image attached just to get past this check still satisfies it (the backend has no way to
   // verify content), but at least one attachment must always be present.
   const odcDocMissing = files.length === 0;
-  const saveBlocked = SHIPMENT_CREATION_BLOCKED || odcDocMissing;
 
   const save = async () => {
-    if (SHIPMENT_CREATION_BLOCKED) {
-      toast.error('ODC document must be attached before this shipment can be saved');
-      return;
-    }
     if (!org.customer_id) { toast.error('Customer is required'); return; }
     if (!org.shipment_route_from_id) { toast.error('Route From is required'); return; }
     if (!org.shipment_route_to_id) { toast.error('Route To is required'); return; }
@@ -408,7 +399,7 @@ export default function OrginPage() {
             {files.length > 0 && (
               <p className="text-xs text-slate-500 mt-1">{files.length} file(s) selected</p>
             )}
-            {saveBlocked && (
+            {odcDocMissing && (
               <p data-testid="orgin-modal-odc-doc-error" className="text-xs text-red-600 mt-1">
                 ODC document must be attached before this shipment can be saved.
               </p>
@@ -418,8 +409,8 @@ export default function OrginPage() {
         <div className="flex justify-end gap-3 mt-6">
           <button onClick={() => setShowModal(false)}
             className="px-4 py-2 border border-slate-300 text-slate-700 text-sm font-semibold rounded-lg hover:bg-slate-50">Cancel</button>
-          <button data-testid="orgin-modal-save-button" onClick={save} disabled={saveBlocked}
-            title={saveBlocked ? 'ODC document must be attached before this shipment can be saved' : undefined}
+          <button data-testid="orgin-modal-save-button" onClick={save} disabled={odcDocMissing}
+            title={odcDocMissing ? 'ODC document must be attached before this shipment can be saved' : undefined}
             className="px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-blue-600">Save Shipment</button>
         </div>
       </Modal>
