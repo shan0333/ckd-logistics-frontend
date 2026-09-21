@@ -136,11 +136,6 @@ export default function OrginPage() {
     } catch { /* best-effort — don't block on a failed check */ }
   };
 
-  // ODC document is mandatory for every new shipment, not just ODC='Y' ones — a placeholder
-  // image attached just to get past this check still satisfies it (the backend has no way to
-  // verify content), but at least one attachment must always be present.
-  const odcDocMissing = files.length === 0;
-
   const save = async () => {
     if (!org.customer_id) { toast.error('Customer is required'); return; }
     if (!org.shipment_route_from_id) { toast.error('Route From is required'); return; }
@@ -150,10 +145,6 @@ export default function OrginPage() {
     if (!org.lr_date) { toast.error('LR Date is required'); return; }
     if (!org.transporter_name?.trim()) { toast.error('Transporter is required'); return; }
     if (dupWarning) { toast.error('This Shipment No already exists'); return; }
-    if (odcDocMissing) {
-      toast.error('ODC document is required');
-      return;
-    }
     setSpinning(true);
     try {
       const payload: Orgin = { ...org, isfastflag: org.fast_mode === 'Y' };
@@ -391,27 +382,19 @@ export default function OrginPage() {
             </select>
           </div>
           <div className="sm:col-span-2">
-            <label className="block text-sm font-medium text-slate-700 mb-1">
-              Attach Images<span className="text-red-500"> * (ODC document required)</span>
-            </label>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Attach Images</label>
             <input type="file" multiple accept="image/*" data-testid="orgin-modal-images-input" className={SEL + ' cursor-pointer'}
               onChange={e => setFiles(Array.from(e.target.files ?? []))} />
             {files.length > 0 && (
               <p className="text-xs text-slate-500 mt-1">{files.length} file(s) selected</p>
-            )}
-            {odcDocMissing && (
-              <p data-testid="orgin-modal-odc-doc-error" className="text-xs text-red-600 mt-1">
-                ODC document must be attached before this shipment can be saved.
-              </p>
             )}
           </div>
         </div>
         <div className="flex justify-end gap-3 mt-6">
           <button onClick={() => setShowModal(false)}
             className="px-4 py-2 border border-slate-300 text-slate-700 text-sm font-semibold rounded-lg hover:bg-slate-50">Cancel</button>
-          <button data-testid="orgin-modal-save-button" onClick={save} disabled={odcDocMissing}
-            title={odcDocMissing ? 'ODC document must be attached before this shipment can be saved' : undefined}
-            className="px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-blue-600">Save Shipment</button>
+          <button data-testid="orgin-modal-save-button" onClick={save}
+            className="px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700">Save Shipment</button>
         </div>
       </Modal>
 
