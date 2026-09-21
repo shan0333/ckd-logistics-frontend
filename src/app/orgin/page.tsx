@@ -12,6 +12,9 @@ import Modal from '@/components/ui/Modal';
 import Spinner from '@/components/ui/Spinner';
 import ActionMenu from '@/components/ui/ActionMenu';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
+import DocumentUpload from '@/components/ui/DocumentUpload';
+import ShipmentImageGrid from '@/components/ui/ShipmentImageGrid';
+import { tagDocs } from '@/lib/shipmentDocs';
 import { RiAddLine, RiDeleteBinLine, RiImageLine, RiEyeLine } from 'react-icons/ri';
 import { isAdmin, getLocId } from '@/lib/auth';
 
@@ -43,7 +46,10 @@ export default function OrginPage() {
   const [spinning, setSpinning] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [org, setOrg] = useState<Orgin>({ ...EMPTY_ORG });
-  const [files, setFiles] = useState<File[]>([]);
+  // ODC document (only offered when ODC = Yes) and LR document (optional) — kept separate so
+  // each is tagged with its kind on upload (see shipmentDocs.ts).
+  const [odcFiles, setOdcFiles] = useState<File[]>([]);
+  const [lrFiles, setLrFiles] = useState<File[]>([]);
   const [dupWarning, setDupWarning] = useState(false);
   const [customers, setCustomers] = useState<GenericData[]>([]);
   const [vehicleTypes, setVehicleTypes] = useState<GenericData[]>([]);
@@ -122,7 +128,8 @@ export default function OrginPage() {
 
   const openCreate = async () => {
     setOrg({ ...EMPTY_ORG });
-    setFiles([]);
+    setOdcFiles([]);
+    setLrFiles([]);
     setDupWarning(false);
     await loadDropdowns();
     setShowModal(true);
@@ -150,7 +157,9 @@ export default function OrginPage() {
       const payload: Orgin = { ...org, isfastflag: org.fast_mode === 'Y' };
       const formData = new FormData();
       formData.append('org', JSON.stringify(payload));
-      files.forEach((f) => formData.append('files', f));
+      // The ODC document field is only shown when ODC = Yes, so it's only sent then.
+      const docs = [...(org.odc === 'Y' ? tagDocs(odcFiles, 'ODC') : []), ...tagDocs(lrFiles, 'LR')];
+      docs.forEach((f) => formData.append('files', f));
       const res = await createOrgin(formData);
       // The backend returns HTTP 200 even on a failed insert, putting the DB/exception
       // text in `message` (data stays null on success too, so it's not a usable signal).
@@ -376,18 +385,25 @@ export default function OrginPage() {
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">ODC</label>
-            <select data-testid="orgin-modal-odc-select" className={SEL} value={org.odc} onChange={e => setOrg(p => ({ ...p, odc: e.target.value as 'Y' | 'N' }))}>
+            <select data-testid="orgin-modal-odc-select" className={SEL} value={org.odc}
+              onChange={e => {
+                const odc = e.target.value as 'Y' | 'N';
+                setOrg(p => ({ ...p, odc }));
+                // The ODC document field disappears on No — drop anything already picked so it
+                // can't reappear stale (and isn't silently uploaded) if ODC is toggled again.
+                if (odc === 'N') setOdcFiles([]);
+              }}>
               <option value="N">No</option>
               <option value="Y">Yes</option>
             </select>
           </div>
+          {org.odc === 'Y' && (
+            <div className="sm:col-span-2">
+              <DocumentUpload testId="orgin-modal-odc-doc" label="ODC Document" files={odcFiles} onChange={setOdcFiles} />
+            </div>
+          )}
           <div className="sm:col-span-2">
-            <label className="block text-sm font-medium text-slate-700 mb-1">Attach Images</label>
-            <input type="file" multiple accept="image/*" data-testid="orgin-modal-images-input" className={SEL + ' cursor-pointer'}
-              onChange={e => setFiles(Array.from(e.target.files ?? []))} />
-            {files.length > 0 && (
-              <p className="text-xs text-slate-500 mt-1">{files.length} file(s) selected</p>
-            )}
+            <DocumentUpload testId="orgin-modal-lr-doc" label="LR Document (optional)" files={lrFiles} onChange={setLrFiles} />
           </div>
         </div>
         <div className="flex justify-end gap-3 mt-6">
@@ -431,15 +447,7 @@ export default function OrginPage() {
         ) : images.length === 0 ? (
           <div data-testid="orgin-images-modal-empty-state" className="py-10 text-center text-slate-400 text-sm">No images uploaded for this shipment.</div>
         ) : (
-          <div data-testid="orgin-images-modal-grid" className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-            {images.map((img) => (
-              <button key={img.id} onClick={() => window.open(img.s3_url, '_blank', 'noopener,noreferrer')}
-                className="relative aspect-square rounded-lg overflow-hidden border border-slate-200 hover:opacity-80">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={img.s3_url} alt={img.file_name ?? 'Shipment'} className="w-full h-full object-cover" />
-              </button>
-            ))}
-          </div>
+          <ShipmentImageGrid testId="orgin-images-modal-grid" images={images} />
         )}
       </Modal>
     </div>

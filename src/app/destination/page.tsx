@@ -11,6 +11,9 @@ import Modal from '@/components/ui/Modal';
 import Spinner from '@/components/ui/Spinner';
 import ActionMenu from '@/components/ui/ActionMenu';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
+import DocumentUpload from '@/components/ui/DocumentUpload';
+import ShipmentImageGrid from '@/components/ui/ShipmentImageGrid';
+import { tagDocs } from '@/lib/shipmentDocs';
 import { RiImageLine, RiEyeLine, RiInboxUnarchiveLine } from 'react-icons/ri';
 import { getLocId } from '@/lib/auth';
 
@@ -56,11 +59,10 @@ export default function DestinationPage() {
 
   const [receiveRow, setReceiveRow] = useState<Orgin | null>(null);
   const [receiveForm, setReceiveForm] = useState({ ...EMPTY_RECEIVE });
-  const [receiveFiles, setReceiveFiles] = useState<File[]>([]);
-  // Photos already on file for this shipment (from an earlier Save) count toward the ODC
-  // mandatory-doc check on Submit — receiveFiles alone would only see files picked in this
-  // session and wrongly block a Submit that has no new files to add.
-  const [existingReceiveImageCount, setExistingReceiveImageCount] = useState(0);
+  // ODC document (only offered when ODC = Yes) and LR document (optional) — kept separate so
+  // each is tagged with its kind on upload (see shipmentDocs.ts).
+  const [receiveOdcFiles, setReceiveOdcFiles] = useState<File[]>([]);
+  const [receiveLrFiles, setReceiveLrFiles] = useState<File[]>([]);
   const [unlocked, setUnlocked] = useState(false);
   const [confirmSubmit, setConfirmSubmit] = useState(false);
   const locId = getLocId();
@@ -101,7 +103,7 @@ export default function DestinationPage() {
 
   const isLocked = (row: Orgin) => row.org_status === 'S';
 
-  const openReceive = async (row: Orgin) => {
+  const openReceive = (row: Orgin) => {
     setReceiveRow(row);
     setReceiveForm({
       vehicle_reported_on: row.vehicle_reported_on ?? '',
@@ -109,36 +111,13 @@ export default function DestinationPage() {
       fast_mode_applicable_or_not: (row.fast_mode_applicable_or_not as 'Y' | 'N') ?? 'N',
       odc: (row.odc as 'Y' | 'N') ?? 'N',
     });
-    setReceiveFiles([]);
-    setExistingReceiveImageCount(0);
+    setReceiveOdcFiles([]);
+    setReceiveLrFiles([]);
     setUnlocked(false);
-    if (row.shipment_no) {
-      try {
-        const res = await getOrginImages(row.shipment_no, 'DEST');
-        setExistingReceiveImageCount((res.data?.data ?? []).length);
-      } catch { /* best-effort — worst case Submit asks for a file that's already on file */ }
-    }
-  };
-
-  // Document is mandatory for every shipment on final Submit, not just ODC='Y' ones — matches
-  // the same unconditional rule on the Origin (creation) page. Not enforced on the intermediate
-  // Save (draft/Work-in-Progress), only on Submit which locks the record.
-  const receiveDocMissing = existingReceiveImageCount + receiveFiles.length === 0;
-
-  const handleSubmitClick = () => {
-    if (receiveDocMissing) {
-      toast.error('ODC document is required');
-      return;
-    }
-    setConfirmSubmit(true);
   };
 
   const doSave = async (submit: boolean) => {
     if (!receiveRow) return;
-    if (submit && receiveDocMissing) {
-      toast.error('ODC document is required');
-      return;
-    }
     setSpinning(true);
     try {
       const payload: Orgin = {
@@ -149,7 +128,9 @@ export default function DestinationPage() {
       };
       const formData = new FormData();
       formData.append('org', JSON.stringify(payload));
-      receiveFiles.forEach((f) => formData.append('files', f));
+      // The ODC document field is only shown when ODC = Yes, so it's only sent then.
+      const docs = [...(receiveForm.odc === 'Y' ? tagDocs(receiveOdcFiles, 'ODC') : []), ...tagDocs(receiveLrFiles, 'LR')];
+      docs.forEach((f) => formData.append('files', f));
       const res = await createOrgin(formData);
       // Backend answers 200 even when the update fails, with the error text in `message`.
       // Treat only the "… Successfully!" messages as an actual save.
@@ -354,28 +335,26 @@ export default function DestinationPage() {
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">ODC</label>
                 <select data-testid="destination-modal-odc-select" disabled={formLocked} className={SEL} value={receiveForm.odc}
-                  onChange={e => setReceiveForm(p => ({ ...p, odc: e.target.value as 'Y' | 'N' }))}>
+                  onChange={e => {
+                    const odc = e.target.value as 'Y' | 'N';
+                    setReceiveForm(p => ({ ...p, odc }));
+                    // The ODC document field disappears on No — drop anything already picked so it
+                    // can't reappear stale (and isn't silently uploaded) if ODC is toggled again.
+                    if (odc === 'N') setReceiveOdcFiles([]);
+                  }}>
                   <option value="N">No</option>
                   <option value="Y">Yes</option>
                 </select>
               </div>
+              {receiveForm.odc === 'Y' && (
+                <div className="sm:col-span-2">
+                  <DocumentUpload testId="destination-modal-odc-doc" label="ODC Document" files={receiveOdcFiles}
+                    onChange={setReceiveOdcFiles} disabled={formLocked} />
+                </div>
+              )}
               <div className="sm:col-span-2">
-                <label className="block text-sm font-medium text-slate-700 mb-1">
-                  Attach Images<span className="text-red-500"> * (ODC document required)</span>
-                </label>
-                <input type="file" multiple accept="image/*" data-testid="destination-modal-images-input" disabled={formLocked} className={SEL + ' cursor-pointer'}
-                  onChange={e => setReceiveFiles(Array.from(e.target.files ?? []))} />
-                {receiveFiles.length > 0 && (
-                  <p className="text-xs text-slate-500 mt-1">{receiveFiles.length} file(s) selected</p>
-                )}
-                {receiveFiles.length === 0 && existingReceiveImageCount > 0 && (
-                  <p className="text-xs text-slate-500 mt-1">{existingReceiveImageCount} photo(s) already on file</p>
-                )}
-                {receiveDocMissing && (
-                  <p data-testid="destination-modal-odc-doc-error" className="text-xs text-red-600 mt-1">
-                    ODC document must be attached before this shipment can be submitted.
-                  </p>
-                )}
+                <DocumentUpload testId="destination-modal-lr-doc" label="LR Document (optional)" files={receiveLrFiles}
+                  onChange={setReceiveLrFiles} disabled={formLocked} />
               </div>
             </div>
             <div className="flex justify-end gap-3 mt-2">
@@ -383,8 +362,7 @@ export default function DestinationPage() {
                 className="px-4 py-2 border border-slate-300 text-slate-700 text-sm font-semibold rounded-lg hover:bg-slate-50">Cancel</button>
               <button data-testid="destination-save-button" onClick={() => doSave(false)} disabled={formLocked}
                 className="px-4 py-2 border border-blue-600 text-blue-600 text-sm font-semibold rounded-lg hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed">Save</button>
-              <button data-testid="destination-submit-button" onClick={handleSubmitClick} disabled={formLocked || receiveDocMissing}
-                title={receiveDocMissing ? 'ODC document must be attached before this shipment can be submitted' : undefined}
+              <button data-testid="destination-submit-button" onClick={() => setConfirmSubmit(true)} disabled={formLocked}
                 className="px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed">Submit</button>
             </div>
           </div>
@@ -400,15 +378,7 @@ export default function DestinationPage() {
         ) : images.length === 0 ? (
           <div data-testid="destination-images-modal-empty-state" className="py-10 text-center text-slate-400 text-sm">No images uploaded for this shipment.</div>
         ) : (
-          <div data-testid="destination-images-modal-grid" className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-            {images.map((img) => (
-              <button key={img.id} onClick={() => window.open(img.s3_url, '_blank', 'noopener,noreferrer')}
-                className="relative aspect-square rounded-lg overflow-hidden border border-slate-200 hover:opacity-80">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={img.s3_url} alt={img.file_name ?? 'Shipment'} className="w-full h-full object-cover" />
-              </button>
-            ))}
-          </div>
+          <ShipmentImageGrid testId="destination-images-modal-grid" images={images} />
         )}
       </Modal>
     </div>
