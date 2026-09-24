@@ -15,6 +15,7 @@ import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import DocumentUpload from '@/components/ui/DocumentUpload';
 import ShipmentImageGrid from '@/components/ui/ShipmentImageGrid';
 import { tagDocs } from '@/lib/shipmentDocs';
+import { formatDateTime } from '@/lib/dateTime';
 import { RiAddLine, RiDeleteBinLine, RiImageLine, RiEyeLine } from 'react-icons/ri';
 import { isAdmin, getLocId } from '@/lib/auth';
 
@@ -428,7 +429,7 @@ export default function OrginPage() {
               ['LR No', viewRow.lr_no], ['LR Date', viewRow.lr_date],
               ['Transporter', viewRow.transporter_name], ['Transit Days', viewRow.transit_days],
               ['Fast Mode', viewRow.fast_mode], ['ODC', viewRow.odc],
-              ['Vehicle Reported On', viewRow.vehicle_reported_on ?? '—'],
+              ['Vehicle Reported On', formatDateTime(viewRow.vehicle_reported_on)],
               ['Created By', viewRow.created_By], ['Updated By', viewRow.updated_By ?? '—'],
             ].map(([label, value]) => (
               <div key={label as string}>

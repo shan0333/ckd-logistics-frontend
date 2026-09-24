@@ -14,6 +14,7 @@ import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import DocumentUpload from '@/components/ui/DocumentUpload';
 import ShipmentImageGrid from '@/components/ui/ShipmentImageGrid';
 import { tagDocs } from '@/lib/shipmentDocs';
+import { toDatetimeLocalValue, fromDatetimeLocalValue, formatDateTime } from '@/lib/dateTime';
 import { RiImageLine, RiEyeLine, RiInboxUnarchiveLine } from 'react-icons/ri';
 import { getLocId } from '@/lib/auth';
 
@@ -106,7 +107,9 @@ export default function DestinationPage() {
   const openReceive = (row: Orgin) => {
     setReceiveRow(row);
     setReceiveForm({
-      vehicle_reported_on: row.vehicle_reported_on ?? '',
+      // Held in the input's own local "YYYY-MM-DDTHH:mm" shape while editing — converted
+      // back to a full ISO timestamp only when the form is actually saved (see doSave).
+      vehicle_reported_on: toDatetimeLocalValue(row.vehicle_reported_on),
       delay_applicable_or_not: (row.delay_applicable_or_not as 'Y' | 'N') ?? 'N',
       fast_mode_applicable_or_not: (row.fast_mode_applicable_or_not as 'Y' | 'N') ?? 'N',
       odc: (row.odc as 'Y' | 'N') ?? 'N',
@@ -124,6 +127,7 @@ export default function DestinationPage() {
         ...receiveRow,
         flag: 'D',
         ...receiveForm,
+        vehicle_reported_on: fromDatetimeLocalValue(receiveForm.vehicle_reported_on),
         org_status: submit ? 'S' : 'C',
       };
       const formData = new FormData();
@@ -190,7 +194,7 @@ export default function DestinationPage() {
     { key: 'vehicle_no', label: 'Vehicle No' },
     { key: 'lr_date', label: 'LR Date' },
     { key: 'curr_status', label: 'Status', render: (row) => statusBadge(row.curr_status) },
-    { key: 'vehicle_reported_on', label: 'Vehicle Reported On', render: (row) => row.vehicle_reported_on ?? '—' },
+    { key: 'vehicle_reported_on', label: 'Vehicle Reported On', render: (row) => formatDateTime(row.vehicle_reported_on) },
     {
       key: 'actions', label: 'Actions',
       render: (row) => (
@@ -282,7 +286,7 @@ export default function DestinationPage() {
               ['Vehicle Type', viewRow.vehicle_type], ['Vehicle No', viewRow.vehicle_no],
               ['LR No', viewRow.lr_no], ['LR Date', viewRow.lr_date],
               ['Transporter', viewRow.transporter_name], ['Transit Days', viewRow.transit_days],
-              ['Vehicle Reported On', viewRow.vehicle_reported_on ?? '—'],
+              ['Vehicle Reported On', formatDateTime(viewRow.vehicle_reported_on)],
               ['Delay Applicable', viewRow.delay_applicable_or_not ?? '—'],
               ['Fast Mode Applicable', viewRow.fast_mode_applicable_or_not ?? '—'],
               ['ODC', viewRow.odc ?? '—'],
@@ -313,7 +317,7 @@ export default function DestinationPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Vehicle Reported On</label>
-                <input type="date" data-testid="destination-modal-vehicle-reported-on-input" disabled={formLocked} className={SEL} value={receiveForm.vehicle_reported_on}
+                <input type="datetime-local" data-testid="destination-modal-vehicle-reported-on-input" disabled={formLocked} className={SEL} value={receiveForm.vehicle_reported_on}
                   onChange={e => setReceiveForm(p => ({ ...p, vehicle_reported_on: e.target.value }))} />
               </div>
               <div>
