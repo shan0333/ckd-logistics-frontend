@@ -14,7 +14,7 @@ import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import DocumentUpload from '@/components/ui/DocumentUpload';
 import ShipmentImageGrid from '@/components/ui/ShipmentImageGrid';
 import { tagDocs, docKindOf, DocKind } from '@/lib/shipmentDocs';
-import { toDatetimeLocalValue, fromDatetimeLocalValue, formatDateTime } from '@/lib/dateTime';
+import { toDatetimeLocalValue, fromDatetimeLocalValue, formatDateTime, formatDateOnly } from '@/lib/dateTime';
 import { RiImageLine, RiEyeLine, RiInboxUnarchiveLine } from 'react-icons/ri';
 import { getLocId } from '@/lib/auth';
 
@@ -226,7 +226,7 @@ export default function DestinationPage() {
     { key: 'shipment_route_from', label: 'Route From' },
     { key: 'transporter_name', label: 'Transporter' },
     { key: 'vehicle_no', label: 'Vehicle No' },
-    { key: 'lr_date', label: 'LR Date' },
+    { key: 'lr_date', label: 'LR Date', render: (row) => formatDateOnly(row.lr_date) },
     { key: 'curr_status', label: 'Status', render: (row) => statusBadge(row.curr_status) },
     { key: 'vehicle_reported_on', label: 'Vehicle Reported On', render: (row) => formatDateTime(row.vehicle_reported_on) },
     {
@@ -318,7 +318,7 @@ export default function DestinationPage() {
               ['Customer', viewRow.customer], ['Status', viewRow.curr_status],
               ['Route From', viewRow.shipment_route_from], ['Route To', viewRow.shipment_route_to],
               ['Vehicle Type', viewRow.vehicle_type], ['Vehicle No', viewRow.vehicle_no],
-              ['LR No', viewRow.lr_no], ['LR Date', viewRow.lr_date],
+              ['LR No', viewRow.lr_no], ['LR Date', formatDateOnly(viewRow.lr_date)],
               ['Transporter', viewRow.transporter_name], ['Transit Days', viewRow.transit_days],
               ['Vehicle Reported On', formatDateTime(viewRow.vehicle_reported_on)],
               ['Delay Applicable', viewRow.delay_applicable_or_not ?? '—'],

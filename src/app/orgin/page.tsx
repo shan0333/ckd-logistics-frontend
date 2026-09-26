@@ -5,8 +5,9 @@ import toast from 'react-hot-toast';
 import {
   getOrginList, createOrgin, deleteOrgin,
   getOrginCustomer, getVehicletype, getLocationList, getOrginImages, dupCheck,
+  getTransporterMasterList,
 } from '@/lib/api';
-import { Orgin, GenericData, Location, OrginImage } from '@/lib/types';
+import { Orgin, GenericData, Location, OrginImage, Transporter } from '@/lib/types';
 import DataTable, { Column } from '@/components/ui/DataTable';
 import Modal from '@/components/ui/Modal';
 import Spinner from '@/components/ui/Spinner';
@@ -15,7 +16,7 @@ import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import DocumentUpload from '@/components/ui/DocumentUpload';
 import ShipmentImageGrid from '@/components/ui/ShipmentImageGrid';
 import { tagDocs } from '@/lib/shipmentDocs';
-import { formatDateTime } from '@/lib/dateTime';
+import { formatDateTime, formatDateOnly } from '@/lib/dateTime';
 import { RiAddLine, RiDeleteBinLine, RiImageLine, RiEyeLine } from 'react-icons/ri';
 import { isAdmin, getLocId } from '@/lib/auth';
 
@@ -42,6 +43,17 @@ const daysAgoStr = (n: number) => {
   return d.toISOString().slice(0, 10);
 };
 
+// ETA is derived, never stored: LR Date + Transit Days. ATA is simply when the vehicle was
+// actually reported at destination (set by the Receiving flow) — blank until then.
+const etaFor = (row: Orgin): string => {
+  const days = parseInt(row.transit_days ?? '', 10);
+  if (!row.lr_date || Number.isNaN(days)) return '—';
+  const d = new Date(row.lr_date);
+  if (Number.isNaN(d.getTime())) return '—';
+  d.setDate(d.getDate() + days);
+  return formatDateOnly(d);
+};
+
 export default function OrginPage() {
   const [all, setAll] = useState<Orgin[]>([]);
   const [loading, setLoading] = useState(false);
@@ -57,6 +69,7 @@ export default function OrginPage() {
   const [vehicleTypes, setVehicleTypes] = useState<GenericData[]>([]);
   const [routeFrom, setRouteFrom] = useState<Location[]>([]);
   const [routeTo, setRouteTo] = useState<Location[]>([]);
+  const [transporters, setTransporters] = useState<Transporter[]>([]);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [fromDate, setFromDate] = useState(daysAgoStr(30));
@@ -121,11 +134,14 @@ export default function OrginPage() {
   );
 
   const loadDropdowns = async () => {
-    const [cu, vt] = await Promise.all([getOrginCustomer(), getVehicletype()]);
+    const [cu, vt, tm] = await Promise.all([
+      getOrginCustomer(), getVehicletype(), getTransporterMasterList({ offset: 0, limit: 500, search: '' }),
+    ]);
     // A category with no rows yet gets back a 204 with an empty-string body, not null/undefined
     // — plain `?? []` doesn't catch that, so guard on Array.isArray instead.
     setCustomers(Array.isArray(cu.data) ? cu.data : []);
     setVehicleTypes(Array.isArray(vt.data) ? vt.data : []);
+    setTransporters(tm.data?.data ?? []);
   };
 
   const openCreate = async () => {
@@ -235,8 +251,13 @@ export default function OrginPage() {
     { key: 'transporter_name', label: 'Transporter', sortable: true },
     { key: 'vehicle_no', label: 'Vehicle No' },
     { key: 'lr_no', label: 'LR No' },
-    { key: 'lr_date', label: 'LR Date' },
+    { key: 'lr_date', label: 'LR Date', render: (row) => formatDateOnly(row.lr_date) },
     { key: 'transit_days', label: 'Transit Days' },
+    { key: 'eta', label: 'ETA', render: (row) => etaFor(row) },
+    {
+      key: 'ata', label: 'ATA',
+      render: (row) => row.vehicle_reported_on ? formatDateTime(row.vehicle_reported_on) : '—',
+    },
     { key: 'curr_status', label: 'Status', render: (row) => statusBadge(row.curr_status) },
     { key: 'created_By', label: 'Created By' },
     {
@@ -366,8 +387,11 @@ export default function OrginPage() {
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Transporter</label>
-            <input data-testid="orgin-modal-transporter-input" className={SEL} value={org.transporter_name ?? ''}
-              onChange={e => setOrg(p => ({ ...p, transporter_name: e.target.value }))} />
+            <select data-testid="orgin-modal-transporter-select" className={SEL} value={org.transporter_name ?? ''}
+              onChange={e => setOrg(p => ({ ...p, transporter_name: e.target.value }))}>
+              <option value="">Select transporter</option>
+              {transporters.map((t) => <option key={t.id} value={t.name}>{t.name}</option>)}
+            </select>
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Transit Days</label>
@@ -428,7 +452,7 @@ export default function OrginPage() {
               ['Customer', viewRow.customer], ['Status', viewRow.curr_status],
               ['Route From', viewRow.shipment_route_from], ['Route To', viewRow.shipment_route_to],
               ['Vehicle Type', viewRow.vehicle_type], ['Vehicle No', viewRow.vehicle_no],
-              ['LR No', viewRow.lr_no], ['LR Date', viewRow.lr_date],
+              ['LR No', viewRow.lr_no], ['LR Date', formatDateOnly(viewRow.lr_date)],
               ['Transporter', viewRow.transporter_name], ['Transit Days', viewRow.transit_days],
               ['Fast Mode', viewRow.fast_mode], ['ODC', viewRow.odc],
               ['Vehicle Reported On', formatDateTime(viewRow.vehicle_reported_on)],

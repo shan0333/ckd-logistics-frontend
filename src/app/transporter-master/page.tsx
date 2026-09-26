@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import {
   getTransporterMasterList, createTransporter, updateTransporter, deleteTransporter,
+  importTransportersFromShipments,
 } from '@/lib/api';
 import { Transporter } from '@/lib/types';
 import DataTable, { Column } from '@/components/ui/DataTable';
@@ -11,7 +12,7 @@ import Modal from '@/components/ui/Modal';
 import Spinner from '@/components/ui/Spinner';
 import ActionMenu from '@/components/ui/ActionMenu';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
-import { RiAddLine, RiDeleteBinLine, RiEditLine } from 'react-icons/ri';
+import { RiAddLine, RiDeleteBinLine, RiEditLine, RiDownloadCloud2Line } from 'react-icons/ri';
 import { isAdmin } from '@/lib/auth';
 
 const EMPTY: Transporter = { name: '', email: '', mobile: '', contactPerson: '' };
@@ -67,6 +68,23 @@ export default function TransporterMasterPage() {
   const openAdd = () => {
     setForm({ ...EMPTY });
     setShowModal(true);
+  };
+
+  // Backfills the master list from every distinct transporter_name already used on a shipment —
+  // added with just a name; email/mobile/contact person are left blank for someone to fill in
+  // via Edit. Safe to run more than once: names already present (active or soft-deleted) are
+  // skipped by the backend, so re-running just picks up anything new.
+  const importFromShipments = async () => {
+    setSpinning(true);
+    try {
+      const res = await importTransportersFromShipments();
+      toast.success(res.data?.message || 'Import complete');
+      load(search);
+    } catch (e: any) {
+      toast.error(e?.response?.data?.message || 'Import failed');
+    } finally {
+      setSpinning(false);
+    }
   };
 
   const openEdit = (row: Transporter) => {
@@ -184,10 +202,16 @@ export default function TransporterMasterPage() {
           <h1 className="text-2xl font-bold text-gray-900">Transporters</h1>
           <p className="text-sm text-gray-500 mt-0.5">{all.length} transporter(s)</p>
         </div>
-        <button data-testid="transporter-add-button" onClick={openAdd}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700">
-          <RiAddLine className="w-4 h-4" /> New Transporter
-        </button>
+        <div className="flex gap-2">
+          <button data-testid="transporter-import-button" onClick={importFromShipments}
+            className="flex items-center gap-2 px-4 py-2 border border-slate-300 text-slate-700 text-sm font-semibold rounded-lg hover:bg-slate-50">
+            <RiDownloadCloud2Line className="w-4 h-4" /> Import from Shipments
+          </button>
+          <button data-testid="transporter-add-button" onClick={openAdd}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700">
+            <RiAddLine className="w-4 h-4" /> New Transporter
+          </button>
+        </div>
       </div>
 
       <div className="relative mb-5 max-w-md">
