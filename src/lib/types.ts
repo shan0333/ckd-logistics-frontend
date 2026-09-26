@@ -32,6 +32,8 @@ export interface Orgin {
   fast_mode?: 'Y' | 'N';
   isfastflag?: boolean;
   odc?: 'Y' | 'N';
+  odc_lot?: string;        // 'L1'-'L6', set when odc='Y' at shipment creation
+  odc_scan_code?: string;  // barcode/QR value scanned for that lot
   fast_mode_applicable_or_not?: 'Y' | 'N';
   delay_applicable_or_not?: 'Y' | 'N';
   vehicle_reported_on?: string;

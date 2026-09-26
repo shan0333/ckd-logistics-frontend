@@ -12,6 +12,8 @@
     "test:e2e:report": "playwright show-report"
   },
   "dependencies": {
+    "@zxing/browser": "^0.2.1",
+    "@zxing/library": "^0.21.3",
     "axios": "^1.18.1",
     "clsx": "^2.1.1",
     "file-saver": "^2.0.5",

@@ -1,31 +1,22 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import toast from 'react-hot-toast';
 import {
-  getOrginList, createOrgin, deleteOrgin,
-  getOrginCustomer, getVehicletype, getLocationList, getOrginImages, dupCheck,
-  getTransporterMasterList,
+  getOrginList, deleteOrgin, getOrginImages,
 } from '@/lib/api';
-import { Orgin, GenericData, Location, OrginImage, Transporter } from '@/lib/types';
+import { Orgin, OrginImage } from '@/lib/types';
 import DataTable, { Column } from '@/components/ui/DataTable';
 import Modal from '@/components/ui/Modal';
 import Spinner from '@/components/ui/Spinner';
 import ActionMenu from '@/components/ui/ActionMenu';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
-import DocumentUpload from '@/components/ui/DocumentUpload';
 import ShipmentImageGrid from '@/components/ui/ShipmentImageGrid';
-import { tagDocs } from '@/lib/shipmentDocs';
 import { formatDateTime, formatDateOnly } from '@/lib/dateTime';
 import { RiAddLine, RiDeleteBinLine, RiImageLine, RiEyeLine } from 'react-icons/ri';
 import { isAdmin, getLocId } from '@/lib/auth';
 
-const EMPTY_ORG: Orgin = {
-  shipment_no: '', vehicle_no: '', lr_no: '', lr_date: '',
-  transporter_name: '', transit_days: '', fast_mode: 'N',
-  odc: 'N', customer_id: '', shipment_route_from_id: '', shipment_route_to_id: '',
-  vehicle_type: '', flag: 'O',
-};
 const STATUS_PILLS = [
   { label: 'All', value: '' },
   { label: 'New', value: 'NEW' },
@@ -63,18 +54,6 @@ export default function OrginPage() {
   const [all, setAll] = useState<Orgin[]>([]);
   const [loading, setLoading] = useState(false);
   const [spinning, setSpinning] = useState(false);
-  const [showModal, setShowModal] = useState(false);
-  const [org, setOrg] = useState<Orgin>({ ...EMPTY_ORG });
-  // ODC document (only offered when ODC = Yes) and LR document (optional) — kept separate so
-  // each is tagged with its kind on upload (see shipmentDocs.ts).
-  const [odcFiles, setOdcFiles] = useState<File[]>([]);
-  const [lrFiles, setLrFiles] = useState<File[]>([]);
-  const [dupWarning, setDupWarning] = useState(false);
-  const [customers, setCustomers] = useState<GenericData[]>([]);
-  const [vehicleTypes, setVehicleTypes] = useState<GenericData[]>([]);
-  const [routeFrom, setRouteFrom] = useState<Location[]>([]);
-  const [routeTo, setRouteTo] = useState<Location[]>([]);
-  const [transporters, setTransporters] = useState<Transporter[]>([]);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [fromDate, setFromDate] = useState(daysAgoStr(30));
@@ -105,24 +84,6 @@ export default function OrginPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  // Route From/To pickers: exclude the 'Logistics' hub location, then split the rest by the
-  // signed-in user's own home location — their location becomes Route From, everything else
-  // becomes Route To. No fixed location (locId null, HQ/admin) sees every location in both.
-  useEffect(() => {
-    getLocationList().then((res) => {
-      const nested = res.data?.data;
-      const raw: Location[] = Array.isArray(nested) ? nested : Array.isArray(res.data) ? res.data : [];
-      const list = raw.filter((l) => l.name !== 'Logistics');
-      if (locId == null) {
-        setRouteFrom(list);
-        setRouteTo(list);
-      } else {
-        setRouteFrom(list.filter((l) => l.id === locId));
-        setRouteTo(list.filter((l) => l.id !== locId));
-      }
-    }).catch(() => {});
-  }, [locId]);
-
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
     if (!q) return all;
@@ -137,75 +98,6 @@ export default function OrginPage() {
     filtered.slice(page * pageSize, (page + 1) * pageSize),
     [filtered, page, pageSize]
   );
-
-  const loadDropdowns = async () => {
-    const [cu, vt, tm] = await Promise.all([
-      getOrginCustomer(), getVehicletype(), getTransporterMasterList({ offset: 0, limit: 500, search: '' }),
-    ]);
-    // A category with no rows yet gets back a 204 with an empty-string body, not null/undefined
-    // — plain `?? []` doesn't catch that, so guard on Array.isArray instead.
-    setCustomers(Array.isArray(cu.data) ? cu.data : []);
-    setVehicleTypes(Array.isArray(vt.data) ? vt.data : []);
-    setTransporters(tm.data?.data ?? []);
-  };
-
-  const openCreate = async () => {
-    setOrg({ ...EMPTY_ORG });
-    setOdcFiles([]);
-    setLrFiles([]);
-    setDupWarning(false);
-    await loadDropdowns();
-    setShowModal(true);
-  };
-
-  const checkDup = async () => {
-    if (!org.shipment_no?.trim()) { setDupWarning(false); return; }
-    try {
-      const res = await dupCheck(org.shipment_no.trim());
-      setDupWarning(res.data?.message === 'true');
-    } catch { /* best-effort — don't block on a failed check */ }
-  };
-
-  const save = async () => {
-    if (!org.customer_id) { toast.error('Customer is required'); return; }
-    if (!org.shipment_route_from_id) { toast.error('Route From is required'); return; }
-    if (!org.shipment_route_to_id) { toast.error('Route To is required'); return; }
-    if (!org.shipment_no?.trim()) { toast.error('Shipment No is required'); return; }
-    if (!org.vehicle_no?.trim()) { toast.error('Vehicle No is required'); return; }
-    if (!org.lr_date) { toast.error('LR Date is required'); return; }
-    if (!org.transporter_name?.trim()) { toast.error('Transporter is required'); return; }
-    // The dropdown is bound to the transporter's name (matches the <select>'s value), but the
-    // backend now stores the Transporter Master id as the authoritative link — look it up here
-    // rather than restructuring the select's own value binding.
-    const selectedTransporter = transporters.find((t) => t.name === org.transporter_name);
-    if (!selectedTransporter?.id) { toast.error('Please pick a transporter from the list'); return; }
-    if (dupWarning) { toast.error('This Shipment No already exists'); return; }
-    setSpinning(true);
-    try {
-      const payload: Orgin = { ...org, isfastflag: org.fast_mode === 'Y', transporter_master_id: selectedTransporter.id };
-      const formData = new FormData();
-      formData.append('org', JSON.stringify(payload));
-      // The ODC document field is only shown when ODC = Yes, so it's only sent then.
-      const docs = [...(org.odc === 'Y' ? tagDocs(odcFiles, 'ODC') : []), ...tagDocs(lrFiles, 'LR')];
-      docs.forEach((f) => formData.append('files', f));
-      const res = await createOrgin(formData);
-      // The backend returns HTTP 200 even on a failed insert, putting the DB/exception
-      // text in `message` (data stays null on success too, so it's not a usable signal).
-      // Only CREATE_MESSAGE/UPDATE_MESSAGE ("… Successfully!") mean it actually saved.
-      const msg: string = res?.data?.message ?? '';
-      if (!/success/i.test(msg)) {
-        toast.error(msg || 'Save failed');
-        return;
-      }
-      toast.success('Shipment saved');
-      setShowModal(false);
-      load();
-    } catch (e: any) {
-      toast.error(e?.response?.data?.message || 'Save failed');
-    } finally {
-      setSpinning(false);
-    }
-  };
 
   const del = async () => {
     if (!confirmRow) return;
@@ -282,8 +174,6 @@ export default function OrginPage() {
     },
   ];
 
-  const SEL = 'w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500';
-
   return (
     <div>
       {spinning && <Spinner fullScreen />}
@@ -302,10 +192,10 @@ export default function OrginPage() {
           <h1 className="text-2xl font-bold text-gray-900">Shipments</h1>
           <p className="text-sm text-gray-500 mt-0.5">{filtered.length} of {all.length} records</p>
         </div>
-        <button data-testid="orgin-new-shipment-button" onClick={openCreate}
+        <Link href="/orgin/new" data-testid="orgin-new-shipment-button"
           className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg text-sm font-medium flex items-center justify-center gap-2">
           <RiAddLine /> New Shipment
-        </button>
+        </Link>
       </div>
 
       {/* Filters */}
@@ -347,110 +237,6 @@ export default function OrginPage() {
           onPageSizeChange={(n) => { setPageSize(n); setPage(0); }} />
       </div>
 
-      {/* Create */}
-      <Modal testId="orgin-new-shipment-modal" open={showModal} onClose={() => setShowModal(false)} title="New Shipment" size="xl">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Customer</label>
-            <select data-testid="orgin-modal-customer-select" className={SEL} value={org.customer_id} onChange={e => setOrg(p => ({ ...p, customer_id: e.target.value }))}>
-              <option value="">Select customer</option>
-              {customers.map((c) => <option key={c.id} value={c.id}>{c.data}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Vehicle Type</label>
-            <select data-testid="orgin-modal-vehicletype-select" className={SEL} value={org.vehicle_type} onChange={e => setOrg(p => ({ ...p, vehicle_type: e.target.value }))}>
-              <option value="">Select type</option>
-              {vehicleTypes.map((v) => <option key={v.id} value={v.id}>{v.data}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Route From</label>
-            <select data-testid="orgin-modal-route-from-select" className={SEL} value={org.shipment_route_from_id} onChange={e => setOrg(p => ({ ...p, shipment_route_from_id: e.target.value }))}>
-              <option value="">Select origin</option>
-              {routeFrom.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Route To</label>
-            <select data-testid="orgin-modal-route-to-select" className={SEL} value={org.shipment_route_to_id} onChange={e => setOrg(p => ({ ...p, shipment_route_to_id: e.target.value }))}>
-              <option value="">Select destination</option>
-              {routeTo.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Shipment No</label>
-            <input data-testid="orgin-modal-shipment-no-input" className={SEL + (dupWarning ? ' border-red-400' : '')} value={org.shipment_no ?? ''}
-              onBlur={checkDup}
-              onChange={e => { setOrg(p => ({ ...p, shipment_no: e.target.value })); setDupWarning(false); }} />
-            {dupWarning && <p data-testid="orgin-modal-shipment-no-dupwarning" className="text-xs text-red-600 mt-1">This Shipment No already exists.</p>}
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Vehicle No</label>
-            <input data-testid="orgin-modal-vehicle-no-input" className={SEL} value={org.vehicle_no ?? ''}
-              onChange={e => setOrg(p => ({ ...p, vehicle_no: e.target.value }))} />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">LR No</label>
-            <input data-testid="orgin-modal-lr-no-input" className={SEL} value={org.lr_no ?? ''}
-              onChange={e => setOrg(p => ({ ...p, lr_no: e.target.value }))} />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Transporter</label>
-            <select data-testid="orgin-modal-transporter-select" className={SEL} value={org.transporter_name ?? ''}
-              onChange={e => setOrg(p => ({ ...p, transporter_name: e.target.value }))}>
-              <option value="">Select transporter</option>
-              {transporters.map((t) => <option key={t.id} value={t.name}>{t.name}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Transit Days</label>
-            <input data-testid="orgin-modal-transit-days-input" className={SEL} value={org.transit_days ?? ''}
-              onChange={e => setOrg(p => ({ ...p, transit_days: e.target.value }))} />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">LR Date</label>
-            <input type="date" data-testid="orgin-modal-lr-date-input" className={SEL} value={org.lr_date ?? ''}
-              onChange={e => setOrg(p => ({ ...p, lr_date: e.target.value }))} />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Fast Mode</label>
-            <select data-testid="orgin-modal-fastmode-select" className={SEL} value={org.fast_mode} onChange={e => setOrg(p => ({ ...p, fast_mode: e.target.value as 'Y' | 'N' }))}>
-              <option value="N">No</option>
-              <option value="Y">Yes</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">ODC</label>
-            <select data-testid="orgin-modal-odc-select" className={SEL} value={org.odc}
-              onChange={e => {
-                const odc = e.target.value as 'Y' | 'N';
-                setOrg(p => ({ ...p, odc }));
-                // The ODC document field disappears on No — drop anything already picked so it
-                // can't reappear stale (and isn't silently uploaded) if ODC is toggled again.
-                if (odc === 'N') setOdcFiles([]);
-              }}>
-              <option value="N">No</option>
-              <option value="Y">Yes</option>
-            </select>
-          </div>
-          {org.odc === 'Y' && (
-            <div className="sm:col-span-2">
-              <DocumentUpload testId="orgin-modal-odc-doc" label="ODC Document" files={odcFiles} onChange={setOdcFiles} />
-            </div>
-          )}
-          <div className="sm:col-span-2">
-            <DocumentUpload testId="orgin-modal-lr-doc" label="LR Document (optional)" files={lrFiles} onChange={setLrFiles} />
-          </div>
-        </div>
-        <div className="flex justify-end gap-3 mt-6">
-          <button onClick={() => setShowModal(false)}
-            className="px-4 py-2 border border-slate-300 text-slate-700 text-sm font-semibold rounded-lg hover:bg-slate-50">Cancel</button>
-          <button data-testid="orgin-modal-save-button" onClick={save}
-            className="px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700">Save Shipment</button>
-        </div>
-      </Modal>
-
       {/* View details — read-only. Editing shipment details (customer/route/vehicle/etc.) isn't
           exposed here: the backend's UPDATE_ORGIN only ever updates the receiving-side fields
           (fast mode, delay, ODC, vehicle-reported-on, status) via the Destination/receive
@@ -464,7 +250,8 @@ export default function OrginPage() {
               ['Vehicle Type', viewRow.vehicle_type], ['Vehicle No', viewRow.vehicle_no],
               ['LR No', viewRow.lr_no], ['LR Date', formatDateOnly(viewRow.lr_date)],
               ['Transporter', transporterDisplayName(viewRow)], ['Transit Days', viewRow.transit_days],
-              ['Fast Mode', viewRow.fast_mode], ['ODC', viewRow.odc],
+              ['Fast Mode', viewRow.fast_mode], ['Inward ODC', viewRow.odc],
+              ['Lot', viewRow.odc_lot ?? '—'], ['Scan Code', viewRow.odc_scan_code ?? '—'],
               ['Vehicle Reported On', formatDateTime(viewRow.vehicle_reported_on)],
               ['Created By', viewRow.created_By], ['Updated By', viewRow.updated_By ?? '—'],
             ].map(([label, value]) => (
