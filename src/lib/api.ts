@@ -50,7 +50,6 @@ export const getTransporterMasterList = (payload: { offset: number; limit: numbe
 export const createTransporter = (payload: Transporter) => api.post('/transporterMaster', payload);
 export const updateTransporter = (payload: Transporter) => api.put('/transporterMaster', payload);
 export const deleteTransporter = (id: number) => api.delete(`/transporterMaster/${id}`);
-export const importTransportersFromShipments = () => api.post('/transporterMaster/importFromShipments');
 
 // ─── Billing Details ──────────────────────────────────────────────────────────
 export const getBillingDetailsList = (payload: { offset: number; limit: number; search?: string }) =>
