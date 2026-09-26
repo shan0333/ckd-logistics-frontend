@@ -7,6 +7,8 @@ import {
   RiTruckLine,
   RiInboxUnarchiveLine,
   RiFileChart2Line,
+  RiContactsLine,
+  RiBillLine,
   RiMenuLine,
   RiCloseLine,
   RiLogoutBoxLine,
@@ -20,6 +22,8 @@ const NAV_ITEMS = [
   { label: 'Shipments', href: '/orgin',       icon: RiTruckLine,          testId: 'nav-orgin' },
   { label: 'Receiving', href: '/destination', icon: RiInboxUnarchiveLine, testId: 'nav-destination' },
   { label: 'Report',    href: '/report',      icon: RiFileChart2Line,     testId: 'nav-report' },
+  { label: 'Transporters', href: '/transporter-master', icon: RiContactsLine, testId: 'nav-transporter-master' },
+  { label: 'Billing', href: '/billing-details', icon: RiBillLine, testId: 'nav-billing-details' },
 ];
 
 export default function Sidebar() {

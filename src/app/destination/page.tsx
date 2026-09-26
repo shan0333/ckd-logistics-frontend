@@ -13,7 +13,7 @@ import ActionMenu from '@/components/ui/ActionMenu';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import DocumentUpload from '@/components/ui/DocumentUpload';
 import ShipmentImageGrid from '@/components/ui/ShipmentImageGrid';
-import { tagDocs } from '@/lib/shipmentDocs';
+import { tagDocs, docKindOf, DocKind } from '@/lib/shipmentDocs';
 import { toDatetimeLocalValue, fromDatetimeLocalValue, formatDateTime } from '@/lib/dateTime';
 import { RiImageLine, RiEyeLine, RiInboxUnarchiveLine } from 'react-icons/ri';
 import { getLocId } from '@/lib/auth';
@@ -25,6 +25,7 @@ const STATUS_PILLS = [
   { label: 'Received', value: 'RECEIVED' },
   { label: 'Work In-Progress', value: 'WORK IN-PROGRESS' },
   { label: 'Over Due', value: 'OVER DUE' },
+  { label: 'Completed', value: 'COMPLETED' },
 ];
 
 const todayStr = () => new Date().toISOString().slice(0, 10);
@@ -64,6 +65,9 @@ export default function DestinationPage() {
   // each is tagged with its kind on upload (see shipmentDocs.ts).
   const [receiveOdcFiles, setReceiveOdcFiles] = useState<File[]>([]);
   const [receiveLrFiles, setReceiveLrFiles] = useState<File[]>([]);
+  // Document kinds already uploaded in an earlier Save on this same shipment — a doc picked in
+  // this session isn't the only way the mandatory-document checks below can be satisfied.
+  const [receiveExistingKinds, setReceiveExistingKinds] = useState<Set<DocKind>>(new Set());
   const [unlocked, setUnlocked] = useState(false);
   const [confirmSubmit, setConfirmSubmit] = useState(false);
   const locId = getLocId();
@@ -104,7 +108,7 @@ export default function DestinationPage() {
 
   const isLocked = (row: Orgin) => row.org_status === 'S';
 
-  const openReceive = (row: Orgin) => {
+  const openReceive = async (row: Orgin) => {
     setReceiveRow(row);
     setReceiveForm({
       // Held in the input's own local "YYYY-MM-DDTHH:mm" shape while editing — converted
@@ -117,6 +121,35 @@ export default function DestinationPage() {
     setReceiveOdcFiles([]);
     setReceiveLrFiles([]);
     setUnlocked(false);
+    setReceiveExistingKinds(new Set());
+    if (row.shipment_no) {
+      try {
+        const res = await getOrginImages(row.shipment_no, 'DEST');
+        const kinds = new Set<DocKind>();
+        for (const img of res.data?.data ?? []) {
+          const kind = docKindOf(img.file_name);
+          if (kind) kinds.add(kind);
+        }
+        setReceiveExistingKinds(kinds);
+      } catch {
+        // non-fatal — the mandatory-document check just falls back to "not yet uploaded"
+      }
+    }
+  };
+
+  // Every field in the Receive form is mandatory — for Save (work in progress) just as much as
+  // Submit (the final receive) — including LR Document always, and ODC Document whenever
+  // Receive ODC = Yes. Documents are satisfied either by a file picked in this session or one
+  // already uploaded in an earlier Save.
+  const validateReceiveForm = () => {
+    if (!receiveForm.vehicle_reported_on) { toast.error('Vehicle Reported On is required.'); return false; }
+    const hasLr = receiveLrFiles.length > 0 || receiveExistingKinds.has('LR');
+    if (!hasLr) { toast.error('LR Document is required.'); return false; }
+    if (receiveForm.odc === 'Y') {
+      const hasOdc = receiveOdcFiles.length > 0 || receiveExistingKinds.has('ODC');
+      if (!hasOdc) { toast.error('ODC Document is required when Receive ODC is Yes.'); return false; }
+    }
+    return true;
   };
 
   const doSave = async (submit: boolean) => {
@@ -172,6 +205,7 @@ export default function DestinationPage() {
       'OVER DUE': 'bg-red-100 text-red-700',
       'WORK IN-PROGRESS': 'bg-yellow-100 text-yellow-700',
       'NEW': 'bg-slate-100 text-slate-600',
+      'COMPLETED': 'bg-indigo-100 text-indigo-700',
     };
     return <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${status ? (map[status] ?? 'bg-slate-100 text-slate-600') : 'bg-slate-100 text-slate-600'}`}>{status ?? '—'}</span>;
   };
@@ -289,7 +323,7 @@ export default function DestinationPage() {
               ['Vehicle Reported On', formatDateTime(viewRow.vehicle_reported_on)],
               ['Delay Applicable', viewRow.delay_applicable_or_not ?? '—'],
               ['Fast Mode Applicable', viewRow.fast_mode_applicable_or_not ?? '—'],
-              ['ODC', viewRow.odc ?? '—'],
+              ['Receive ODC', viewRow.odc ?? '—'],
               ['Created By', viewRow.created_By], ['Updated By', viewRow.updated_By ?? '—'],
             ].map(([label, value]) => (
               <div key={label as string}>
@@ -316,12 +350,12 @@ export default function DestinationPage() {
             )}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Vehicle Reported On</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Vehicle Reported On <span className="text-red-500">*</span></label>
                 <input type="datetime-local" data-testid="destination-modal-vehicle-reported-on-input" disabled={formLocked} className={SEL} value={receiveForm.vehicle_reported_on}
                   onChange={e => setReceiveForm(p => ({ ...p, vehicle_reported_on: e.target.value }))} />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Delay Applicable</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Delay Applicable <span className="text-red-500">*</span></label>
                 <select data-testid="destination-modal-delay-select" disabled={formLocked} className={SEL} value={receiveForm.delay_applicable_or_not}
                   onChange={e => setReceiveForm(p => ({ ...p, delay_applicable_or_not: e.target.value as 'Y' | 'N' }))}>
                   <option value="N">No</option>
@@ -329,7 +363,7 @@ export default function DestinationPage() {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Fast Mode Applicable</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Fast Mode Applicable <span className="text-red-500">*</span></label>
                 <select data-testid="destination-modal-fastmode-select" disabled={formLocked} className={SEL} value={receiveForm.fast_mode_applicable_or_not}
                   onChange={e => setReceiveForm(p => ({ ...p, fast_mode_applicable_or_not: e.target.value as 'Y' | 'N' }))}>
                   <option value="N">No</option>
@@ -337,7 +371,7 @@ export default function DestinationPage() {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">ODC</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Receive ODC <span className="text-red-500">*</span></label>
                 <select data-testid="destination-modal-odc-select" disabled={formLocked} className={SEL} value={receiveForm.odc}
                   onChange={e => {
                     const odc = e.target.value as 'Y' | 'N';
@@ -350,23 +384,23 @@ export default function DestinationPage() {
                   <option value="Y">Yes</option>
                 </select>
               </div>
+              <div className="sm:col-span-2">
+                <DocumentUpload testId="destination-modal-lr-doc" label="LR Document *" files={receiveLrFiles}
+                  onChange={setReceiveLrFiles} disabled={formLocked} />
+              </div>
               {receiveForm.odc === 'Y' && (
                 <div className="sm:col-span-2">
-                  <DocumentUpload testId="destination-modal-odc-doc" label="ODC Document" files={receiveOdcFiles}
+                  <DocumentUpload testId="destination-modal-odc-doc" label="ODC Document *" files={receiveOdcFiles}
                     onChange={setReceiveOdcFiles} disabled={formLocked} />
                 </div>
               )}
-              <div className="sm:col-span-2">
-                <DocumentUpload testId="destination-modal-lr-doc" label="LR Document (optional)" files={receiveLrFiles}
-                  onChange={setReceiveLrFiles} disabled={formLocked} />
-              </div>
             </div>
             <div className="flex justify-end gap-3 mt-2">
               <button onClick={() => setReceiveRow(null)}
                 className="px-4 py-2 border border-slate-300 text-slate-700 text-sm font-semibold rounded-lg hover:bg-slate-50">Cancel</button>
-              <button data-testid="destination-save-button" onClick={() => doSave(false)} disabled={formLocked}
+              <button data-testid="destination-save-button" onClick={() => { if (validateReceiveForm()) doSave(false); }} disabled={formLocked}
                 className="px-4 py-2 border border-blue-600 text-blue-600 text-sm font-semibold rounded-lg hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed">Save</button>
-              <button data-testid="destination-submit-button" onClick={() => setConfirmSubmit(true)} disabled={formLocked}
+              <button data-testid="destination-submit-button" onClick={() => { if (validateReceiveForm()) setConfirmSubmit(true); }} disabled={formLocked}
                 className="px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed">Submit</button>
             </div>
           </div>

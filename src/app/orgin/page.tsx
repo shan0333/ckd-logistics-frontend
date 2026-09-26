@@ -32,6 +32,7 @@ const STATUS_PILLS = [
   { label: 'Received', value: 'RECEIVED' },
   { label: 'Work In-Progress', value: 'WORK IN-PROGRESS' },
   { label: 'Over Due', value: 'OVER DUE' },
+  { label: 'Completed', value: 'COMPLETED' },
 ];
 
 const todayStr = () => new Date().toISOString().slice(0, 10);
@@ -211,6 +212,7 @@ export default function OrginPage() {
       'OVER DUE': 'bg-red-100 text-red-700',
       'WORK IN-PROGRESS': 'bg-yellow-100 text-yellow-700',
       'NEW': 'bg-slate-100 text-slate-600',
+      'COMPLETED': 'bg-indigo-100 text-indigo-700',
     };
     return <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${status ? (map[status] ?? 'bg-slate-100 text-slate-600') : 'bg-slate-100 text-slate-600'}`}>{status ?? '—'}</span>;
   };

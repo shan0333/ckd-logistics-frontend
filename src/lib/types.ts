@@ -70,6 +70,67 @@ export interface OrginImage {
 // fixed location" on the plain list endpoint (falls back to no location filter), but note
 // /shipmentGraphInfo and /dashorgininfo need the literal string '-1' instead — see the comment
 // in dashboard/page.tsx.
+// Matches Logistics-backend's TransporterMaster.java exactly (BeanPropertyRowMapper maps
+// snake_case DB/query columns to these camelCase getters automatically; Jackson serializes
+// by getter name as-is, so the wire shape is already camelCase — no case-sensitivity gotcha
+// here like Orgin above).
+export interface Transporter {
+  id?: number;
+  name?: string;
+  email?: string;
+  mobile?: string;
+  contactPerson?: string;
+  createdBy?: number;
+  createdDate?: string;
+  modifiedBy?: number;
+  modifiedDate?: string;
+  status?: number;
+  /** List/read only — count of active shipments whose transporter_name matches this row's
+   *  name (case-insensitively). Never sent on create/update. */
+  shipmentCount?: number;
+  /** Write-only — set once the "this will rename N shipments" warning has already been shown
+   *  and confirmed. See TransporterMasterServiceImpl.update() on the backend. */
+  confirmed?: boolean;
+}
+
+// Matches Logistics-backend's BillingDetails.java exactly (camelCase both ways, same as
+// Transporter above — no case-sensitivity gotcha here, unlike Orgin). One row per shipment;
+// totalBillingAmount/customerTotalAmount/shipmentNo are read-only, computed/joined server-side.
+export interface BillingDetails {
+  id?: number;
+  orginId?: number;
+  shipmentNo?: string;
+  grnNumber?: string;
+  podStatus?: 'Y' | 'N' | '';
+  invoiceNumber?: string;
+  invoiceDate?: string;
+  baseFare?: number | string;
+  haltingCharges?: number | string;
+  totalBillingAmount?: number;
+  customerInvoiceNo?: string;
+  customerInvoiceDate?: string;
+  customerBaseFare?: number | string;
+  customerHaltingCharges?: number | string;
+  customerTotalAmount?: number;
+  status?: 'DRAFT' | 'FINAL';
+  createdBy?: number;
+  createdDate?: string;
+  modifiedBy?: number;
+  modifiedDate?: string;
+}
+
+// A row from /billingDetails/eligibleShipments — same shape as the fields SELECT_ORGIN
+// happens to alias the same way (customer/vehicle_no/transporter_name/lr_date), reusing Orgin's
+// field names rather than inventing a parallel set.
+export interface EligibleShipment {
+  id?: number;
+  shipment_no?: string;
+  customer?: string;
+  vehicle_no?: string;
+  transporter_name?: string;
+  lr_date?: string;
+}
+
 export interface OrginFilter {
   fromDate?: string;
   toDate?: string;

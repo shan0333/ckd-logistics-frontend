@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { OrginFilter } from './types';
+import type { OrginFilter, Transporter, BillingDetails } from './types';
 
 // Same-origin /api on spaceageconnect.com routes to the same Logistics-backend the CKD app
 // already uses (nginx's /api location isn't scoped per Referer path except for the legacy
@@ -43,6 +43,21 @@ export const getOrginImages = (shipmentNo: string, flag: 'ORGIN' | 'DEST') =>
   api.get(`/getImage/${shipmentNo}/${flag}`);
 export const getTransporterName = () => api.get('/transporterName');
 export const dupCheck = (shipNo: any) => api.get(`/dupCheck/${shipNo}`);
+
+// ─── Transporter Master ──────────────────────────────────────────────────────
+export const getTransporterMasterList = (payload: { offset: number; limit: number; search?: string }) =>
+  api.post('/transporterMaster/list', payload);
+export const createTransporter = (payload: Transporter) => api.post('/transporterMaster', payload);
+export const updateTransporter = (payload: Transporter) => api.put('/transporterMaster', payload);
+export const deleteTransporter = (id: number) => api.delete(`/transporterMaster/${id}`);
+
+// ─── Billing Details ──────────────────────────────────────────────────────────
+export const getBillingDetailsList = (payload: { offset: number; limit: number; search?: string }) =>
+  api.post('/billingDetails/list', payload);
+export const getEligibleShipmentsForBilling = (search: string) =>
+  api.get('/billingDetails/eligibleShipments', { params: { search } });
+export const createBillingDetails = (payload: BillingDetails) => api.post('/billingDetails', payload);
+export const updateBillingDetails = (payload: BillingDetails) => api.put('/billingDetails', payload);
 
 // ─── Dashboard / Report ──────────────────────────────────────────────────────
 export const getShipmentGraphInfo = (payload: OrginFilter) => api.post('/shipmentGraphInfo', payload);
