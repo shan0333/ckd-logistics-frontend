@@ -25,7 +25,9 @@ export interface Orgin {
   vehicle_no?: string;
   lr_no?: string;
   lr_date?: string;
-  transporter_name?: string;
+  transporter_name?: string;        // denormalized snapshot; prefer transporter_master_name for display
+  transporter_master_id?: number;   // write: the transporter's id in Transporter Master
+  transporter_master_name?: string; // read-only: live name, joined from Transporter Master by id
   transit_days?: string;
   fast_mode?: 'Y' | 'N';
   isfastflag?: boolean;

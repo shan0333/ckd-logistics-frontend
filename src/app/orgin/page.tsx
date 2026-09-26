@@ -43,6 +43,11 @@ const daysAgoStr = (n: number) => {
   return d.toISOString().slice(0, 10);
 };
 
+// Prefer the live Transporter Master name (joined server-side by transporter_master_id) over the
+// free-text snapshot — they only diverge if the transporter was renamed in Master after this
+// shipment was created and the row predates the transporter_master_id link (see the migration).
+const transporterDisplayName = (row: Orgin): string => row.transporter_master_name ?? row.transporter_name ?? '';
+
 // ETA is derived, never stored: LR Date + Transit Days. ATA is simply when the vehicle was
 // actually reported at destination (set by the Receiving flow) — blank until then.
 const etaFor = (row: Orgin): string => {
@@ -123,7 +128,7 @@ export default function OrginPage() {
     if (!q) return all;
     return all.filter((r) =>
       (r.shipment_no ?? '').toLowerCase().includes(q) ||
-      (r.transporter_name ?? '').toLowerCase().includes(q) ||
+      (transporterDisplayName(r)).toLowerCase().includes(q) ||
       (r.vehicle_no ?? '').toLowerCase().includes(q)
     );
   }, [all, search]);
@@ -169,10 +174,15 @@ export default function OrginPage() {
     if (!org.vehicle_no?.trim()) { toast.error('Vehicle No is required'); return; }
     if (!org.lr_date) { toast.error('LR Date is required'); return; }
     if (!org.transporter_name?.trim()) { toast.error('Transporter is required'); return; }
+    // The dropdown is bound to the transporter's name (matches the <select>'s value), but the
+    // backend now stores the Transporter Master id as the authoritative link — look it up here
+    // rather than restructuring the select's own value binding.
+    const selectedTransporter = transporters.find((t) => t.name === org.transporter_name);
+    if (!selectedTransporter?.id) { toast.error('Please pick a transporter from the list'); return; }
     if (dupWarning) { toast.error('This Shipment No already exists'); return; }
     setSpinning(true);
     try {
-      const payload: Orgin = { ...org, isfastflag: org.fast_mode === 'Y' };
+      const payload: Orgin = { ...org, isfastflag: org.fast_mode === 'Y', transporter_master_id: selectedTransporter.id };
       const formData = new FormData();
       formData.append('org', JSON.stringify(payload));
       // The ODC document field is only shown when ODC = Yes, so it's only sent then.
@@ -248,7 +258,7 @@ export default function OrginPage() {
     { key: 'customer', label: 'Customer' },
     { key: 'shipment_route_from', label: 'Route From' },
     { key: 'shipment_route_to', label: 'Route To' },
-    { key: 'transporter_name', label: 'Transporter', sortable: true },
+    { key: 'transporter_name', label: 'Transporter', sortable: true, render: (row) => transporterDisplayName(row) || '—' },
     { key: 'vehicle_no', label: 'Vehicle No' },
     { key: 'lr_no', label: 'LR No' },
     { key: 'lr_date', label: 'LR Date', render: (row) => formatDateOnly(row.lr_date) },
@@ -453,7 +463,7 @@ export default function OrginPage() {
               ['Route From', viewRow.shipment_route_from], ['Route To', viewRow.shipment_route_to],
               ['Vehicle Type', viewRow.vehicle_type], ['Vehicle No', viewRow.vehicle_no],
               ['LR No', viewRow.lr_no], ['LR Date', formatDateOnly(viewRow.lr_date)],
-              ['Transporter', viewRow.transporter_name], ['Transit Days', viewRow.transit_days],
+              ['Transporter', transporterDisplayName(viewRow)], ['Transit Days', viewRow.transit_days],
               ['Fast Mode', viewRow.fast_mode], ['ODC', viewRow.odc],
               ['Vehicle Reported On', formatDateTime(viewRow.vehicle_reported_on)],
               ['Created By', viewRow.created_By], ['Updated By', viewRow.updated_By ?? '—'],
