@@ -13,9 +13,13 @@ import ActionMenu from '@/components/ui/ActionMenu';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import DocumentUpload from '@/components/ui/DocumentUpload';
 import ShipmentImageGrid from '@/components/ui/ShipmentImageGrid';
+import { SectionCard, FieldLabel } from '@/components/ui/SectionCard';
 import { tagDocs, docKindOf, DocKind } from '@/lib/shipmentDocs';
 import { toDatetimeLocalValue, fromDatetimeLocalValue, formatDateTime, formatDateOnly } from '@/lib/dateTime';
-import { RiImageLine, RiEyeLine, RiInboxUnarchiveLine } from 'react-icons/ri';
+import {
+  RiImageLine, RiEyeLine, RiInboxUnarchiveLine, RiInboxArchiveLine, RiImage2Line,
+  RiLockLine, RiCheckLine,
+} from 'react-icons/ri';
 import { getLocId } from '@/lib/auth';
 
 const STATUS_PILLS = [
@@ -341,67 +345,74 @@ export default function DestinationPage() {
         {receiveRow && (
           <div className="flex flex-col gap-4">
             {formLocked && (
-              <div className="px-3 py-2 rounded-lg bg-amber-50 border border-amber-200 text-amber-700 text-sm flex items-center justify-between">
-                <span>This shipment has already been submitted and is locked.</span>
+              <div className="px-3 py-2.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-700 text-sm flex items-center justify-between">
+                <span className="flex items-center gap-2"><RiLockLine className="w-4 h-4 shrink-0" /> This shipment has already been submitted and is locked.</span>
                 {canForceUnlock && (
                   <button data-testid="destination-enable-edit-button" onClick={() => setUnlocked(true)} className="font-semibold underline shrink-0 ml-3">Enable Edit</button>
                 )}
               </div>
             )}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Vehicle Reported On <span className="text-red-500">*</span></label>
-                <input type="datetime-local" data-testid="destination-modal-vehicle-reported-on-input" disabled={formLocked} className={SEL} value={receiveForm.vehicle_reported_on}
-                  onChange={e => setReceiveForm(p => ({ ...p, vehicle_reported_on: e.target.value }))} />
+
+            <SectionCard title="Receiving Details" icon={RiInboxArchiveLine} accent="purple">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <FieldLabel>Vehicle Reported On <span className="text-red-500">*</span></FieldLabel>
+                  <input type="datetime-local" data-testid="destination-modal-vehicle-reported-on-input" disabled={formLocked} className={SEL} value={receiveForm.vehicle_reported_on}
+                    onChange={e => setReceiveForm(p => ({ ...p, vehicle_reported_on: e.target.value }))} />
+                </div>
+                <div>
+                  <FieldLabel>Delay Applicable <span className="text-red-500">*</span></FieldLabel>
+                  <select data-testid="destination-modal-delay-select" disabled={formLocked} className={SEL} value={receiveForm.delay_applicable_or_not}
+                    onChange={e => setReceiveForm(p => ({ ...p, delay_applicable_or_not: e.target.value as 'Y' | 'N' }))}>
+                    <option value="N">No</option>
+                    <option value="Y">Yes</option>
+                  </select>
+                </div>
+                <div>
+                  <FieldLabel>Fast Mode Applicable <span className="text-red-500">*</span></FieldLabel>
+                  <select data-testid="destination-modal-fastmode-select" disabled={formLocked} className={SEL} value={receiveForm.fast_mode_applicable_or_not}
+                    onChange={e => setReceiveForm(p => ({ ...p, fast_mode_applicable_or_not: e.target.value as 'Y' | 'N' }))}>
+                    <option value="N">No</option>
+                    <option value="Y">Yes</option>
+                  </select>
+                </div>
+                <div>
+                  <FieldLabel>Receive ODC <span className="text-red-500">*</span></FieldLabel>
+                  <select data-testid="destination-modal-odc-select" disabled={formLocked} className={SEL} value={receiveForm.odc}
+                    onChange={e => {
+                      const odc = e.target.value as 'Y' | 'N';
+                      setReceiveForm(p => ({ ...p, odc }));
+                      // The ODC document field disappears on No — drop anything already picked so it
+                      // can't reappear stale (and isn't silently uploaded) if ODC is toggled again.
+                      if (odc === 'N') setReceiveOdcFiles([]);
+                    }}>
+                    <option value="N">No</option>
+                    <option value="Y">Yes</option>
+                  </select>
+                </div>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Delay Applicable <span className="text-red-500">*</span></label>
-                <select data-testid="destination-modal-delay-select" disabled={formLocked} className={SEL} value={receiveForm.delay_applicable_or_not}
-                  onChange={e => setReceiveForm(p => ({ ...p, delay_applicable_or_not: e.target.value as 'Y' | 'N' }))}>
-                  <option value="N">No</option>
-                  <option value="Y">Yes</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Fast Mode Applicable <span className="text-red-500">*</span></label>
-                <select data-testid="destination-modal-fastmode-select" disabled={formLocked} className={SEL} value={receiveForm.fast_mode_applicable_or_not}
-                  onChange={e => setReceiveForm(p => ({ ...p, fast_mode_applicable_or_not: e.target.value as 'Y' | 'N' }))}>
-                  <option value="N">No</option>
-                  <option value="Y">Yes</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Receive ODC <span className="text-red-500">*</span></label>
-                <select data-testid="destination-modal-odc-select" disabled={formLocked} className={SEL} value={receiveForm.odc}
-                  onChange={e => {
-                    const odc = e.target.value as 'Y' | 'N';
-                    setReceiveForm(p => ({ ...p, odc }));
-                    // The ODC document field disappears on No — drop anything already picked so it
-                    // can't reappear stale (and isn't silently uploaded) if ODC is toggled again.
-                    if (odc === 'N') setReceiveOdcFiles([]);
-                  }}>
-                  <option value="N">No</option>
-                  <option value="Y">Yes</option>
-                </select>
-              </div>
-              <div className="sm:col-span-2">
+            </SectionCard>
+
+            <SectionCard title="Documents" icon={RiImage2Line} accent="teal">
+              <div className="flex flex-col gap-4">
                 <DocumentUpload testId="destination-modal-lr-doc" label="LR Document *" files={receiveLrFiles}
                   onChange={setReceiveLrFiles} disabled={formLocked} />
-              </div>
-              {receiveForm.odc === 'Y' && (
-                <div className="sm:col-span-2">
+                {receiveForm.odc === 'Y' && (
                   <DocumentUpload testId="destination-modal-odc-doc" label="ODC Document *" files={receiveOdcFiles}
                     onChange={setReceiveOdcFiles} disabled={formLocked} />
-                </div>
-              )}
-            </div>
+                )}
+              </div>
+            </SectionCard>
+
             <div className="flex justify-end gap-3 mt-2">
               <button onClick={() => setReceiveRow(null)}
                 className="px-4 py-2 border border-slate-300 text-slate-700 text-sm font-semibold rounded-lg hover:bg-slate-50">Cancel</button>
               <button data-testid="destination-save-button" onClick={() => { if (validateReceiveForm()) doSave(false); }} disabled={formLocked}
                 className="px-4 py-2 border border-blue-600 text-blue-600 text-sm font-semibold rounded-lg hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed">Save</button>
               <button data-testid="destination-submit-button" onClick={() => { if (validateReceiveForm()) setConfirmSubmit(true); }} disabled={formLocked}
-                className="px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed">Submit</button>
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">
+                <RiCheckLine className="w-4 h-4" /> Submit
+              </button>
             </div>
           </div>
         )}

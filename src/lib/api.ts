@@ -33,6 +33,8 @@ export const authenticate = (username: string, password: string) =>
 
 // ─── Orgin (Shipments) ───────────────────────────────────────────────────────
 export const getOrginList = (payload: OrginFilter) => api.post('/getOrgin', payload);
+export const getOrginByShipmentNo = (shipmentNo: string) => api.get(`/getDestination/${shipmentNo}`);
+export const getOdcLotsByShipmentNo = (shipmentNo: string) => api.get(`/getOdcLots/${shipmentNo}`);
 export const createOrgin = (formData: FormData) =>
   api.post('/createOrgin', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
 export const deleteOrgin = (payload: any) => api.post('/deleteOrgin', payload);
@@ -41,6 +43,7 @@ export const getVehicletype = () => api.get('/getVehicletype');
 export const getLocationList = () => api.get('/getLocation');
 export const getOrginImages = (shipmentNo: string, flag: 'ORGIN' | 'DEST') =>
   api.get(`/getImage/${shipmentNo}/${flag}`);
+export const deleteOrginImage = (id: number) => api.get(`/deleteImage/${id}`);
 export const getTransporterName = () => api.get('/transporterName');
 export const dupCheck = (shipNo: any) => api.get(`/dupCheck/${shipNo}`);
 

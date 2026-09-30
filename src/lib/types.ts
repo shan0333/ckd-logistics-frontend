@@ -32,8 +32,10 @@ export interface Orgin {
   fast_mode?: 'Y' | 'N';
   isfastflag?: boolean;
   odc?: 'Y' | 'N';
-  odc_lot?: string;        // 'L1'-'L6', set when odc='Y' at shipment creation
-  odc_scan_code?: string;  // barcode/QR value scanned for that lot
+  // Write-only — every NEW Inward ODC lot scan being added in this request (create: all of
+  // them; edit: any additional ones beyond what's already saved). Never populated on read —
+  // fetch existing scans separately via getOdcLotsByShipmentNo.
+  odc_lots?: OdcLot[];
   fast_mode_applicable_or_not?: 'Y' | 'N';
   delay_applicable_or_not?: 'Y' | 'N';
   vehicle_reported_on?: string;
@@ -67,6 +69,18 @@ export interface OrginImage {
   category?: string;
   file_name?: string;
   s3_url?: string; // pre-signed by the backend before it reaches the client
+  odc_lot_id?: number; // which Inward ODC lot scan this document belongs to, if any
+}
+
+// One Inward ODC lot scan (orgin_odc_lot) — a shipment can have any number, and the same lot
+// value can repeat (e.g. L4 scanned twice); the Shipment view groups scans by lot.
+export interface OdcLot {
+  id?: number;
+  orginId?: number;
+  lot?: string;
+  scanCode?: string;
+  createdBy?: number;
+  createdDate?: string;
 }
 
 // Matches Logistics-backend's FilterData.java exactly (same case-sensitive-JSON caveat as

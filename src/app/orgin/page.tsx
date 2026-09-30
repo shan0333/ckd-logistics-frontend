@@ -2,19 +2,18 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 import {
-  getOrginList, deleteOrgin, getOrginImages,
+  getOrginList, deleteOrgin,
 } from '@/lib/api';
-import { Orgin, OrginImage } from '@/lib/types';
+import { Orgin } from '@/lib/types';
 import DataTable, { Column } from '@/components/ui/DataTable';
-import Modal from '@/components/ui/Modal';
 import Spinner from '@/components/ui/Spinner';
 import ActionMenu from '@/components/ui/ActionMenu';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
-import ShipmentImageGrid from '@/components/ui/ShipmentImageGrid';
 import { formatDateTime, formatDateOnly } from '@/lib/dateTime';
-import { RiAddLine, RiDeleteBinLine, RiImageLine, RiEyeLine } from 'react-icons/ri';
+import { RiAddLine, RiDeleteBinLine, RiEyeLine } from 'react-icons/ri';
 import { isAdmin, getLocId } from '@/lib/auth';
 
 const STATUS_PILLS = [
@@ -51,6 +50,7 @@ const etaFor = (row: Orgin): string => {
 };
 
 export default function OrginPage() {
+  const router = useRouter();
   const [all, setAll] = useState<Orgin[]>([]);
   const [loading, setLoading] = useState(false);
   const [spinning, setSpinning] = useState(false);
@@ -61,10 +61,6 @@ export default function OrginPage() {
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(10);
   const [confirmRow, setConfirmRow] = useState<Orgin | null>(null);
-  const [imageShipment, setImageShipment] = useState<string | null>(null);
-  const [images, setImages] = useState<OrginImage[]>([]);
-  const [loadingImages, setLoadingImages] = useState(false);
-  const [viewRow, setViewRow] = useState<Orgin | null>(null);
   const admin = isAdmin();
   const locId = getLocId();
 
@@ -111,18 +107,6 @@ export default function OrginPage() {
     finally { setSpinning(false); }
   };
 
-  const openImages = async (row: Orgin) => {
-    if (!row.shipment_no) return;
-    setImageShipment(row.shipment_no);
-    setImages([]);
-    setLoadingImages(true);
-    try {
-      const res = await getOrginImages(row.shipment_no, 'ORGIN');
-      setImages(res.data?.data ?? []);
-    } catch { toast.error('Failed to load images'); }
-    finally { setLoadingImages(false); }
-  };
-
   const statusBadge = (status?: string) => {
     const map: Record<string, string> = {
       'RECEIVED': 'bg-green-100 text-green-700',
@@ -142,9 +126,9 @@ export default function OrginPage() {
     {
       key: 'shipment_no', label: 'Shipment No', sortable: true,
       render: (row) => (
-        <button data-testid={`orgin-row-view-${row.shipment_no}`} className="text-blue-600 hover:underline font-medium" onClick={() => setViewRow(row)}>
+        <Link href={`/orgin/${encodeURIComponent(row.shipment_no ?? '')}`} data-testid={`orgin-row-view-${row.shipment_no}`} className="text-blue-600 hover:underline font-medium">
           {row.shipment_no}
-        </button>
+        </Link>
       ),
     },
     { key: 'customer', label: 'Customer' },
@@ -166,8 +150,7 @@ export default function OrginPage() {
       key: 'actions', label: 'Actions',
       render: (row) => (
         <ActionMenu triggerTestId={`orgin-row-actions-${row.shipment_no}`} items={[
-          { label: 'View', icon: RiEyeLine, onClick: () => setViewRow(row), testId: `orgin-row-action-view-${row.shipment_no}` },
-          { label: 'Images', icon: RiImageLine, onClick: () => openImages(row), testId: `orgin-row-action-images-${row.shipment_no}` },
+          { label: 'View', icon: RiEyeLine, onClick: () => router.push(`/orgin/${encodeURIComponent(row.shipment_no ?? '')}`), testId: `orgin-row-action-view-${row.shipment_no}` },
           { label: 'Delete', icon: RiDeleteBinLine, danger: true, hidden: !admin, onClick: () => setConfirmRow(row), testId: `orgin-row-delete-${row.shipment_no}` },
         ]} />
       ),
@@ -237,43 +220,6 @@ export default function OrginPage() {
           onPageSizeChange={(n) => { setPageSize(n); setPage(0); }} />
       </div>
 
-      {/* View details — read-only. Editing shipment details (customer/route/vehicle/etc.) isn't
-          exposed here: the backend's UPDATE_ORGIN only ever updates the receiving-side fields
-          (fast mode, delay, ODC, vehicle-reported-on, status) via the Destination/receive
-          workflow, not the fields set at creation — an edit form for those would silently no-op. */}
-      <Modal testId="orgin-view-modal" open={!!viewRow} onClose={() => setViewRow(null)} title={`Shipment ${viewRow?.shipment_no ?? ''}`} size="lg">
-        {viewRow && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-sm">
-            {[
-              ['Customer', viewRow.customer], ['Status', viewRow.curr_status],
-              ['Route From', viewRow.shipment_route_from], ['Route To', viewRow.shipment_route_to],
-              ['Vehicle Type', viewRow.vehicle_type], ['Vehicle No', viewRow.vehicle_no],
-              ['LR No', viewRow.lr_no], ['LR Date', formatDateOnly(viewRow.lr_date)],
-              ['Transporter', transporterDisplayName(viewRow)], ['Transit Days', viewRow.transit_days],
-              ['Fast Mode', viewRow.fast_mode], ['Inward ODC', viewRow.odc],
-              ['Lot', viewRow.odc_lot ?? '—'], ['Scan Code', viewRow.odc_scan_code ?? '—'],
-              ['Vehicle Reported On', formatDateTime(viewRow.vehicle_reported_on)],
-              ['Created By', viewRow.created_By], ['Updated By', viewRow.updated_By ?? '—'],
-            ].map(([label, value]) => (
-              <div key={label as string}>
-                <div className="text-xs font-medium text-slate-500">{label}</div>
-                <div className="text-slate-800">{(value as string) || '—'}</div>
-              </div>
-            ))}
-          </div>
-        )}
-      </Modal>
-
-      {/* Images */}
-      <Modal testId="orgin-images-modal" open={!!imageShipment} onClose={() => setImageShipment(null)} title={`Images — ${imageShipment ?? ''}`} size="lg">
-        {loadingImages ? (
-          <div className="py-10 text-center text-slate-400 text-sm">Loading…</div>
-        ) : images.length === 0 ? (
-          <div data-testid="orgin-images-modal-empty-state" className="py-10 text-center text-slate-400 text-sm">No images uploaded for this shipment.</div>
-        ) : (
-          <ShipmentImageGrid testId="orgin-images-modal-grid" images={images} />
-        )}
-      </Modal>
     </div>
   );
 }
