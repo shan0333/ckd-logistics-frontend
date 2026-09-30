@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { OrginFilter, Transporter, BillingDetails } from './types';
+import type { OrginFilter, Transporter } from './types';
 
 // Same-origin /api on spaceageconnect.com routes to the same Logistics-backend the CKD app
 // already uses (nginx's /api location isn't scoped per Referer path except for the legacy
@@ -59,8 +59,10 @@ export const getBillingDetailsList = (payload: { offset: number; limit: number; 
   api.post('/billingDetails/list', payload);
 export const getEligibleShipmentsForBilling = (search: string) =>
   api.get('/billingDetails/eligibleShipments', { params: { search } });
-export const createBillingDetails = (payload: BillingDetails) => api.post('/billingDetails', payload);
-export const updateBillingDetails = (payload: BillingDetails) => api.put('/billingDetails', payload);
+export const createBillingDetails = (formData: FormData) =>
+  api.post('/billingDetails', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+export const updateBillingDetails = (formData: FormData) =>
+  api.put('/billingDetails', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
 
 // ─── Dashboard / Report ──────────────────────────────────────────────────────
 export const getShipmentGraphInfo = (payload: OrginFilter) => api.post('/shipmentGraphInfo', payload);

@@ -18,9 +18,11 @@ import { OrginImage } from '@/lib/types';
 // checks that id actually belongs to this shipment before linking the upload (resolveLotId).
 // This tag is stored permanently as-is in image.file_name once uploaded, same as the index-based
 // one, so displayName/docKindOf below must keep recognizing it forever, not just at upload time.
-export type DocKind = 'ODC' | 'LR';
+// Billing Details' Transporter Billing document reuses this exact same tag-the-filename trick
+// (image.name = shipment_no, category = "BILLING" — see BillingDetailsServiceImpl.uploadBillingDocs).
+export type DocKind = 'ODC' | 'LR' | 'BILLING';
 
-const PREFIXES: Record<DocKind, string> = { ODC: 'ODC_', LR: 'LR_' };
+const PREFIXES: Record<DocKind, string> = { ODC: 'ODC_', LR: 'LR_', BILLING: 'BILLING_' };
 const ODC_LOT_PREFIX = /^ODC(?:EXISTING)?(\d*)_/;
 
 // What the system file picker accepts — photos and PDFs. Camera captures are always images.
@@ -52,15 +54,17 @@ export function docKindOf(fileName?: string | null): DocKind | null {
   if (!fileName) return null;
   if (ODC_LOT_PREFIX.test(fileName)) return 'ODC';
   if (fileName.startsWith(PREFIXES.LR)) return 'LR';
+  if (fileName.startsWith(PREFIXES.BILLING)) return 'BILLING';
   return null;
 }
 
-/** The file name without the ODC_/ODC<n>_/LR_ tag, for showing to people. */
+/** The file name without the ODC_/ODC<n>_/LR_/BILLING_ tag, for showing to people. */
 export function displayName(fileName?: string | null): string {
   if (!fileName) return '';
   const odcMatch = fileName.match(ODC_LOT_PREFIX);
   if (odcMatch) return fileName.slice(odcMatch[0].length);
   if (fileName.startsWith(PREFIXES.LR)) return fileName.slice(PREFIXES.LR.length);
+  if (fileName.startsWith(PREFIXES.BILLING)) return fileName.slice(PREFIXES.BILLING.length);
   return fileName;
 }
 

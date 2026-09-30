@@ -4,13 +4,17 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import {
   getBillingDetailsList, getEligibleShipmentsForBilling, createBillingDetails, updateBillingDetails,
+  getOrginImages,
 } from '@/lib/api';
-import { BillingDetails, EligibleShipment } from '@/lib/types';
+import { BillingDetails, EligibleShipment, OrginImage } from '@/lib/types';
 import DataTable, { Column } from '@/components/ui/DataTable';
 import Modal from '@/components/ui/Modal';
 import Spinner from '@/components/ui/Spinner';
 import ActionMenu from '@/components/ui/ActionMenu';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
+import DocumentUpload from '@/components/ui/DocumentUpload';
+import ShipmentImageGrid from '@/components/ui/ShipmentImageGrid';
+import { tagDocs } from '@/lib/shipmentDocs';
 import { RiAddLine, RiEditLine, RiEyeLine } from 'react-icons/ri';
 import { isAdmin } from '@/lib/auth';
 
@@ -54,6 +58,12 @@ export default function BillingDetailsPage() {
   const [shipmentDropdownOpen, setShipmentDropdownOpen] = useState(false);
 
   const [confirmSubmit, setConfirmSubmit] = useState(false);
+
+  // Transporter Billing document(s) — newly picked files (not yet uploaded) plus whatever's
+  // already on file for this shipment (edit mode only; nothing can exist yet on Add).
+  const [billingFiles, setBillingFiles] = useState<File[]>([]);
+  const [existingBillingDocs, setExistingBillingDocs] = useState<OrginImage[]>([]);
+  const [loadingBillingDocs, setLoadingBillingDocs] = useState(false);
 
   const admin = isAdmin();
 
@@ -104,14 +114,32 @@ export default function BillingDetailsPage() {
     setShipmentSearch('');
     setShipments([]);
     loadShipments('');
+    setBillingFiles([]);
+    setExistingBillingDocs([]);
     setShowModal(true);
   };
 
-  const openEdit = (row: BillingDetails, readOnly: boolean) => {
+  const openEdit = async (row: BillingDetails, readOnly: boolean) => {
     setForm({ ...row });
     setViewOnly(readOnly);
     setUnlocked(false);
+    setBillingFiles([]);
+    setExistingBillingDocs([]);
     setShowModal(true);
+    if (!row.shipmentNo) return;
+    setLoadingBillingDocs(true);
+    try {
+      // Passing anything other than "ORGIN" skips the backend's category filter (see
+      // OrginServiceImpl.getImageList), so this also returns any LR/ODC docs on the same
+      // shipment — filtered back down to just this record's own Transporter Billing doc(s).
+      const res = await getOrginImages(row.shipmentNo, 'DEST');
+      const images: OrginImage[] = res.data?.data ?? [];
+      setExistingBillingDocs(images.filter((img) => img.category === 'BILLING'));
+    } catch {
+      // non-fatal — the upload control still works, it just won't show what's already on file
+    } finally {
+      setLoadingBillingDocs(false);
+    }
   };
 
   const formLocked = viewOnly || (!!form.id && isLocked(form) && !unlocked);
@@ -144,7 +172,10 @@ export default function BillingDetailsPage() {
     const payload: BillingDetails = { ...form, status: asFinal ? 'FINAL' : 'DRAFT' };
     setSpinning(true);
     try {
-      const res = form.id ? await updateBillingDetails(payload) : await createBillingDetails(payload);
+      const formData = new FormData();
+      formData.append('billing', JSON.stringify(payload));
+      tagDocs(billingFiles, 'BILLING').forEach((f) => formData.append('files', f));
+      const res = form.id ? await updateBillingDetails(formData) : await createBillingDetails(formData);
       const dto = res.data ?? {};
       toast.success(dto.message || 'Saved Successfully!');
       setShowModal(false);
@@ -328,6 +359,21 @@ export default function BillingDetailsPage() {
               <label className="block text-sm font-medium text-slate-700 mb-1">Total Billing Amount</label>
               <input data-testid="billing-modal-total-billing-amount" disabled className={SEL + ' font-semibold'}
                 value={total(form.baseFare, form.haltingCharges)} readOnly />
+            </div>
+            <div className="sm:col-span-2">
+              {loadingBillingDocs ? (
+                <p className="text-xs text-slate-400">Loading document…</p>
+              ) : existingBillingDocs.length > 0 ? (
+                <div className="mb-2">
+                  <div className="text-xs font-medium text-slate-500 mb-1">Already on file</div>
+                  <ShipmentImageGrid testId="billing-modal-existing-doc" images={existingBillingDocs} />
+                </div>
+              ) : null}
+              {!viewOnly && (
+                <DocumentUpload testId="billing-modal-doc" disabled={formLocked}
+                  label={existingBillingDocs.length > 0 ? 'Replace Document' : 'Document (optional)'}
+                  files={billingFiles} onChange={setBillingFiles} />
+              )}
             </div>
           </div>
         </div>
