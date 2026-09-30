@@ -34,12 +34,14 @@ const LOTS = ['L1', 'L2', 'L3', 'L4', 'L5', 'L6'];
 
 const SEL = 'w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors';
 
-interface DraftLot {
+interface CabinRow {
   lot: string;
   scanCode: string;
   hasOdc: boolean;
   files: File[];
 }
+
+const EMPTY_CABIN_ROW: CabinRow = { lot: '', scanCode: '', hasOdc: false, files: [] };
 
 interface Props {
   mode: 'create' | 'edit';
@@ -87,14 +89,11 @@ export default function ShipmentForm({ mode, initial, existingOdcLots, existingI
 
   // The Cabin section always shows and has no minimum — the user can add any number of Cabin
   // scans, and the same Cabin value can be added more than once (e.g. two separate boxes both
-  // labelled L4). Each one is built up in "draft" (pick a Cabin -> scan its barcode/QR -> tick
-  // ODC if it needs a document -> upload that document) then appended to addedLots via "Add
-  // Cabin", which resets the draft for the next one.
-  const [addedLots, setAddedLots] = useState<DraftLot[]>([]);
-  const [draftLot, setDraftLot] = useState('');
-  const [draftScanCode, setDraftScanCode] = useState('');
-  const [draftHasOdc, setDraftHasOdc] = useState(false);
-  const [draftFiles, setDraftFiles] = useState<File[]>([]);
+  // labelled L4). Every row stays fully editable for as long as the form is open (Cabin, Scan
+  // code, ODC, document can all still be changed after "Add Cabin" — nothing collapses into a
+  // read-only summary), so the user can come back and adjust an earlier cabin at any time.
+  const [cabinRows, setCabinRows] = useState<CabinRow[]>([{ ...EMPTY_CABIN_ROW }]);
+  const [scanRowIndex, setScanRowIndex] = useState<number | null>(null);
 
   // Already-saved lots (edit mode) — their Lot/Scan Code are fixed (recorded at scan time), but
   // the documents attached to them can still be added to or removed, right from this form.
@@ -103,10 +102,12 @@ export default function ShipmentForm({ mode, initial, existingOdcLots, existingI
   const [imageToRemove, setImageToRemove] = useState<OrginImage | null>(null);
   const [removingImage, setRemovingImage] = useState(false);
 
-  const draftLotPicked = !!draftLot;
-  const draftScanDone = !!draftScanCode.trim();
-  // Scan is always required to add a Cabin; the document is only required if ODC is checked.
-  const canAddDraft = draftLotPicked && draftScanDone && (!draftHasOdc || draftFiles.length > 0);
+  const lastCabinRow = cabinRows[cabinRows.length - 1];
+  // Gate "Add Cabin" on the last row being usable (Cabin picked, Scan done, and its ODC document
+  // uploaded if ODC is checked), so blank rows don't pile up — but this never locks earlier rows;
+  // every row above stays editable regardless of this row's state.
+  const canAddAnotherCabinRow = !lastCabinRow
+    || (!!lastCabinRow.lot && !!lastCabinRow.scanCode.trim() && (!lastCabinRow.hasOdc || lastCabinRow.files.length > 0));
 
   useEffect(() => {
     (async () => {
@@ -143,17 +144,17 @@ export default function ShipmentForm({ mode, initial, existingOdcLots, existingI
     } catch { /* best-effort — don't block on a failed check */ }
   };
 
-  const addDraftLot = () => {
-    if (!canAddDraft) return;
-    setAddedLots((p) => [...p, { lot: draftLot, scanCode: draftScanCode, hasOdc: draftHasOdc, files: draftFiles }]);
-    setDraftLot('');
-    setDraftScanCode('');
-    setDraftHasOdc(false);
-    setDraftFiles([]);
+  const updateCabinRow = (index: number, patch: Partial<CabinRow>) => {
+    setCabinRows((p) => p.map((r, i) => (i === index ? { ...r, ...patch } : r)));
   };
 
-  const removeAddedLot = (index: number) => {
-    setAddedLots((p) => p.filter((_, i) => i !== index));
+  const addCabinRow = () => {
+    if (!canAddAnotherCabinRow) return;
+    setCabinRows((p) => [...p, { ...EMPTY_CABIN_ROW }]);
+  };
+
+  const removeCabinRow = (index: number) => {
+    setCabinRows((p) => p.filter((_, i) => i !== index));
   };
 
   const confirmRemoveImage = async () => {
@@ -190,17 +191,24 @@ export default function ShipmentForm({ mode, initial, existingOdcLots, existingI
       toast.error('LR Document is required');
       return;
     }
+    // A row only counts once a Cabin has actually been picked — an untouched blank row (e.g. the
+    // one always left at the bottom for adding another) is just a placeholder, not a real entry.
+    const cabinsToSave = cabinRows.filter((r) => r.lot);
+    for (const r of cabinsToSave) {
+      if (!r.scanCode.trim()) { toast.error(`Scan a code for Cabin ${r.lot} before saving`); return; }
+      if (r.hasOdc && r.files.length === 0) { toast.error(`Upload an ODC document for Cabin ${r.lot} before saving`); return; }
+    }
     setSpinning(true);
     try {
       const payload: Orgin = {
         ...org, isfastflag: org.fast_mode === 'Y', transporter_master_id: selectedTransporter.id,
-        odc_lots: addedLots.map((l) => ({ lot: l.lot, scanCode: l.scanCode, hasOdc: l.hasOdc ? 'Y' : 'N' })),
+        odc_lots: cabinsToSave.map((r) => ({ lot: r.lot, scanCode: r.scanCode, hasOdc: r.hasOdc ? 'Y' : 'N' })),
         ...(mode === 'edit' ? { id: initial?.id } : {}),
       };
       const formData = new FormData();
       formData.append('org', JSON.stringify(payload));
       const docs = [
-        ...addedLots.flatMap((l, i) => tagDocsForLot(l.files, i + 1)),
+        ...cabinsToSave.flatMap((r, i) => tagDocsForLot(r.files, i + 1)),
         ...Object.entries(newFilesByLotId).flatMap(([lotId, files]) => tagDocsForExistingLot(files, Number(lotId))),
         ...tagDocs(lrFiles, 'LR'),
       ];
@@ -231,7 +239,7 @@ export default function ShipmentForm({ mode, initial, existingOdcLots, existingI
         open={scanModalOpen}
         onClose={() => setScanModalOpen(false)}
         onScan={(code) => {
-          setDraftScanCode(code);
+          if (scanRowIndex != null) updateCabinRow(scanRowIndex, { scanCode: code });
           setScanModalOpen(false);
           toast.success('Code scanned');
         }}
@@ -389,95 +397,86 @@ export default function ShipmentForm({ mode, initial, existingOdcLots, existingI
               </ul>
             )}
 
-            {addedLots.length > 0 && (
-              <ul data-testid="orgin-modal-added-lots-list" className="mb-4 space-y-2">
-                {addedLots.map((l, i) => (
-                  <li key={i} data-testid={`orgin-modal-added-lot-${i}`}
-                    className="flex items-center justify-between gap-2 px-3 py-2 bg-orange-50/40 border border-orange-100 rounded-lg text-sm">
-                    <div className="flex items-center gap-2">
-                      <span className="px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 text-xs font-bold">{l.lot}</span>
-                      <span className="text-green-700 font-semibold flex items-center gap-1">
-                        <RiCheckLine className="w-4 h-4" /> Scanned: {l.scanCode}
-                      </span>
-                      {l.hasOdc && (
-                        <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 text-[11px] font-bold">ODC</span>
-                      )}
-                      {l.hasOdc && (
-                        <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 text-[11px] font-semibold">{l.files.length} file(s)</span>
-                      )}
-                    </div>
-                    <button type="button" data-testid={`orgin-modal-remove-lot-${i}`} onClick={() => removeAddedLot(i)}
-                      aria-label={`Remove Cabin ${l.lot}`} className="text-slate-400 hover:text-red-600">
-                      <RiCloseLine className="w-4 h-4" />
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-
-            {((existingOdcLots ?? []).length > 0 || addedLots.length > 0) && (
+            {(existingOdcLots ?? []).length > 0 && (
               <h4 className="text-xs font-bold text-orange-700 uppercase tracking-wide mb-2">Add a New Cabin</h4>
             )}
 
-            <div className="flex flex-wrap items-end gap-4">
-              <div className="w-36">
-                <FieldLabel>Cabin</FieldLabel>
-                <select data-testid="orgin-modal-odc-lot-select" className={SEL} value={draftLot}
-                  onChange={e => { setDraftLot(e.target.value); setDraftScanCode(''); setDraftHasOdc(false); setDraftFiles([]); }}>
-                  <option value="">Select cabin</option>
-                  {LOTS.map((l) => <option key={l} value={l}>{l}</option>)}
-                </select>
-              </div>
+            <div data-testid="orgin-modal-cabin-rows" className="space-y-3 mb-3">
+              {cabinRows.map((row, i) => (
+                <div key={i} data-testid={`orgin-modal-cabin-row-${i}`}
+                  className="p-3 bg-orange-50/40 border border-orange-100 rounded-lg">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex flex-wrap items-end gap-4 flex-1">
+                      <div className="w-36">
+                        <FieldLabel>Cabin</FieldLabel>
+                        <select data-testid={`orgin-modal-cabin-row-${i}-lot-select`} className={SEL} value={row.lot}
+                          onChange={e => updateCabinRow(i, { lot: e.target.value, scanCode: '', hasOdc: false, files: [] })}>
+                          <option value="">Select cabin</option>
+                          {LOTS.map((l) => <option key={l} value={l}>{l}</option>)}
+                        </select>
+                      </div>
 
-              {draftLotPicked && (
-                <div className="flex-1 min-w-[240px]">
-                  <FieldLabel>Scan Barcode / QR Code</FieldLabel>
-                  <div className="flex gap-2">
-                    <input data-testid="orgin-modal-odc-scan-input" className={SEL} placeholder="Scan with a handheld scanner, or type the code…"
-                      autoFocus value={draftScanCode}
-                      onChange={e => setDraftScanCode(e.target.value)} />
-                    <button type="button" data-testid="orgin-modal-odc-scan-camera-button" onClick={() => setScanModalOpen(true)}
-                      className="flex items-center gap-2 px-4 py-2 border border-slate-300 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50 shrink-0">
-                      <RiQrScan2Line className="w-4 h-4" />
+                      {!!row.lot && (
+                        <div className="flex-1 min-w-[240px]">
+                          <FieldLabel>Scan Barcode / QR Code</FieldLabel>
+                          <div className="flex gap-2">
+                            <input data-testid={`orgin-modal-cabin-row-${i}-scan-input`} className={SEL}
+                              placeholder="Scan with a handheld scanner, or type the code…"
+                              value={row.scanCode}
+                              onChange={e => updateCabinRow(i, { scanCode: e.target.value })} />
+                            <button type="button" data-testid={`orgin-modal-cabin-row-${i}-scan-camera-button`}
+                              onClick={() => { setScanRowIndex(i); setScanModalOpen(true); }}
+                              className="flex items-center gap-2 px-4 py-2 border border-slate-300 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50 shrink-0">
+                              <RiQrScan2Line className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {!!row.lot && (
+                        <div className="pb-2">
+                          <label className="flex items-center gap-2 cursor-pointer select-none">
+                            <input type="checkbox" data-testid={`orgin-modal-cabin-row-${i}-odc-checkbox`} checked={row.hasOdc}
+                              onChange={e => updateCabinRow(i, { hasOdc: e.target.checked })}
+                              className="w-4 h-4 rounded border-slate-300 text-orange-600 focus:ring-orange-500" />
+                            <span className="text-sm font-semibold text-slate-700">ODC</span>
+                          </label>
+                        </div>
+                      )}
+                    </div>
+
+                    <button type="button" data-testid={`orgin-modal-cabin-row-${i}-remove-button`} onClick={() => removeCabinRow(i)}
+                      aria-label={`Remove Cabin row ${i + 1}`} className="text-slate-400 hover:text-red-600 shrink-0 mt-1">
+                      <RiCloseLine className="w-4 h-4" />
                     </button>
                   </div>
-                </div>
-              )}
 
-              {draftLotPicked && (
-                <div className="pb-2">
-                  <label className="flex items-center gap-2 cursor-pointer select-none">
-                    <input type="checkbox" data-testid="orgin-modal-odc-checkbox" checked={draftHasOdc}
-                      onChange={e => setDraftHasOdc(e.target.checked)}
-                      className="w-4 h-4 rounded border-slate-300 text-orange-600 focus:ring-orange-500" />
-                    <span className="text-sm font-semibold text-slate-700">ODC</span>
-                  </label>
+                  {!!row.lot && !!row.scanCode.trim() && (
+                    <p data-testid={`orgin-modal-cabin-row-${i}-scan-done`} className="text-xs text-green-700 mt-2 flex items-center gap-1">
+                      <RiCheckLine className="w-4 h-4" /> Scanned: {row.scanCode}
+                    </p>
+                  )}
+
+                  {!!row.lot && row.hasOdc && (
+                    <div className="mt-3">
+                      <DocumentUpload testId={`orgin-modal-cabin-row-${i}-doc`} label="ODC Document for this Cabin"
+                        files={row.files} onChange={(files) => updateCabinRow(i, { files })} />
+                    </div>
+                  )}
                 </div>
-              )}
+              ))}
             </div>
 
-            {draftLotPicked && draftScanDone && (
-              <p data-testid="orgin-modal-odc-scan-done" className="text-xs text-green-700 mt-1 flex items-center gap-1">
-                <RiCheckLine className="w-4 h-4" /> Scanned: {draftScanCode}
-              </p>
-            )}
-
-            {draftLotPicked && draftHasOdc && (
-              <div className="mt-3">
-                <DocumentUpload testId="orgin-modal-odc-doc" label="ODC Document for this Cabin" files={draftFiles} onChange={setDraftFiles} />
-              </div>
-            )}
-
-            <div className="mt-3">
-              <button type="button" data-testid="orgin-modal-add-lot-button" onClick={addDraftLot} disabled={!canAddDraft}
+            <div>
+              <button type="button" data-testid="orgin-modal-add-lot-button" onClick={addCabinRow} disabled={!canAddAnotherCabinRow}
                 className="flex items-center gap-2 px-4 py-2 border border-blue-600 text-blue-600 text-sm font-semibold rounded-lg hover:bg-blue-50 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent">
                 <RiAddLine className="w-4 h-4" /> Add Cabin
               </button>
-              {!canAddDraft && (
+              {!canAddAnotherCabinRow && lastCabinRow && (
                 <p className="text-xs text-slate-400 mt-1">
-                  {!draftLotPicked ? 'Pick a Cabin to add it.'
-                    : !draftScanDone ? 'Scan or enter a code for this cabin.'
-                    : 'Upload this cabin\'s ODC document to add it.'}
+                  {!lastCabinRow.lot ? 'Pick a Cabin above to add another.'
+                    : !lastCabinRow.scanCode.trim() ? 'Scan or enter a code for that cabin first.'
+                    : 'Upload that cabin\'s ODC document first.'}
                 </p>
               )}
             </div>
