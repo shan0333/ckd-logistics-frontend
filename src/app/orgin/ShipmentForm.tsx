@@ -178,6 +178,13 @@ export default function ShipmentForm({ mode, initial, existingOdcLots, existingI
     const selectedTransporter = transporters.find((t) => t.name === org.transporter_name);
     if (!selectedTransporter?.id) { toast.error('Please pick a transporter from the list'); return; }
     if (mode === 'create' && dupWarning) { toast.error('This Shipment No already exists'); return; }
+    // LR Document is mandatory at creation only — not re-enforced on edit, since shipments
+    // created before this rule existed have no LR doc on file and would otherwise become
+    // permanently uneditable.
+    if (mode === 'create' && lrFiles.length === 0) {
+      toast.error('LR Document is required');
+      return;
+    }
     if (org.odc === 'Y' && addedLots.length === 0 && (existingOdcLots ?? []).length === 0) {
       toast.error('Please add at least one Lot');
       return;
@@ -359,7 +366,7 @@ export default function ShipmentForm({ mode, initial, existingOdcLots, existingI
         </SectionCard>
 
         <SectionCard title="Documents" icon={RiImage2Line} accent="teal">
-          <DocumentUpload testId="orgin-modal-lr-doc" label="LR Document (optional)" files={lrFiles} onChange={setLrFiles} />
+          <DocumentUpload testId="orgin-modal-lr-doc" label="LR Document *" files={lrFiles} onChange={setLrFiles} />
         </SectionCard>
 
         {org.odc === 'Y' && (
