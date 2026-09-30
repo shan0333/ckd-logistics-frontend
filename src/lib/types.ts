@@ -31,10 +31,12 @@ export interface Orgin {
   transit_days?: string;
   fast_mode?: 'Y' | 'N';
   isfastflag?: boolean;
+  // Read-only, server-derived — 'Y' whenever this shipment has any Cabin scan at all (see
+  // OrginServiceImpl.deriveOdcFlag). Not a form field; the frontend never sets this directly.
   odc?: 'Y' | 'N';
-  // Write-only — every NEW Inward ODC lot scan being added in this request (create: all of
-  // them; edit: any additional ones beyond what's already saved). Never populated on read —
-  // fetch existing scans separately via getOdcLotsByShipmentNo.
+  // Write-only — every NEW Cabin scan being added in this request (create: all of them; edit:
+  // any additional ones beyond what's already saved). Never populated on read — fetch existing
+  // scans separately via getOdcLotsByShipmentNo.
   odc_lots?: OdcLot[];
   fast_mode_applicable_or_not?: 'Y' | 'N';
   delay_applicable_or_not?: 'Y' | 'N';
@@ -72,13 +74,16 @@ export interface OrginImage {
   odc_lot_id?: number; // which Inward ODC lot scan this document belongs to, if any
 }
 
-// One Inward ODC lot scan (orgin_odc_lot) — a shipment can have any number, and the same lot
-// value can repeat (e.g. L4 scanned twice); the Shipment view groups scans by lot.
+// One Inward ODC lot scan (orgin_odc_lot) — a shipment can have any number, and the same "Cabin"
+// (lot) value can repeat (e.g. L4 scanned twice); the Shipment view groups scans by cabin.
+// hasOdc is per-entry — there's no more shipment-wide Inward ODC toggle, each cabin scan
+// independently decides whether it needs an ODC document.
 export interface OdcLot {
   id?: number;
   orginId?: number;
   lot?: string;
   scanCode?: string;
+  hasOdc?: 'Y' | 'N';
   createdBy?: number;
   createdDate?: string;
 }

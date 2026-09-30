@@ -184,45 +184,46 @@ export default function ShipmentViewPage() {
             </div>
           </Card>
 
-          {row.odc === 'Y' && (
-            <Card title="Inward ODC" icon={RiBox3Line} accent="orange">
-              {loadingOdcLots ? (
-                <div className="py-6 text-center text-slate-400 text-sm">Loading…</div>
-              ) : lotGroups.length === 0 ? (
-                <div data-testid="orgin-view-odc-lots-empty-state" className="py-6 text-center text-slate-400 text-sm">No lot scans recorded.</div>
-              ) : (
-                <div data-testid="orgin-view-odc-lot-groups" className="space-y-4">
-                  {lotGroups.map((group) => (
-                    <div key={group.lot} data-testid={`orgin-view-odc-lot-group-${group.lot}`} className="border border-orange-100 bg-orange-50/40 rounded-lg p-3">
-                      <div className="flex items-center gap-2 mb-2">
-                        <span className="px-2.5 py-1 rounded-full bg-orange-100 text-orange-700 text-xs font-bold">{group.lot}</span>
-                        {group.entries.length > 1 && (
-                          <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 text-[11px] font-semibold">{group.entries.length} scans</span>
-                        )}
-                      </div>
-                      <ul className="space-y-2">
-                        {group.entries.map((entry) => {
-                          const docs = images.filter((img) => entry.id != null && img.odc_lot_id === entry.id);
-                          return (
-                            <li key={entry.id} className="text-sm">
-                              <p className="text-green-700 font-semibold flex items-center gap-1">
-                                <RiCheckLine className="w-4 h-4" /> Scanned: {entry.scanCode}
-                              </p>
-                              {docs.length > 0 && (
-                                <div className="mt-2 ml-5">
-                                  <ShipmentImageGrid testId={`orgin-view-odc-lot-${entry.id}-images`} images={docs} />
-                                </div>
-                              )}
-                            </li>
-                          );
-                        })}
-                      </ul>
+          <Card title="Cabin Details" icon={RiBox3Line} accent="orange">
+            {loadingOdcLots ? (
+              <div className="py-6 text-center text-slate-400 text-sm">Loading…</div>
+            ) : lotGroups.length === 0 ? (
+              <div data-testid="orgin-view-odc-lots-empty-state" className="py-6 text-center text-slate-400 text-sm">No cabin scans recorded.</div>
+            ) : (
+              <div data-testid="orgin-view-odc-lot-groups" className="space-y-4">
+                {lotGroups.map((group) => (
+                  <div key={group.lot} data-testid={`orgin-view-odc-lot-group-${group.lot}`} className="border border-orange-100 bg-orange-50/40 rounded-lg p-3">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="px-2.5 py-1 rounded-full bg-orange-100 text-orange-700 text-xs font-bold">{group.lot}</span>
+                      {group.entries.length > 1 && (
+                        <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 text-[11px] font-semibold">{group.entries.length} scans</span>
+                      )}
                     </div>
-                  ))}
-                </div>
-              )}
-            </Card>
-          )}
+                    <ul className="space-y-2">
+                      {group.entries.map((entry) => {
+                        const docs = images.filter((img) => entry.id != null && img.odc_lot_id === entry.id);
+                        return (
+                          <li key={entry.id} className="text-sm">
+                            <p className="text-green-700 font-semibold flex items-center gap-1">
+                              <RiCheckLine className="w-4 h-4" /> Scanned: {entry.scanCode}
+                              {entry.hasOdc === 'Y' && (
+                                <span className="ml-1 px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 text-[11px] font-bold">ODC</span>
+                              )}
+                            </p>
+                            {docs.length > 0 && (
+                              <div className="mt-2 ml-5">
+                                <ShipmentImageGrid testId={`orgin-view-odc-lot-${entry.id}-images`} images={docs} />
+                              </div>
+                            )}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Card>
 
           <Card title="Documents & Images" icon={RiImage2Line} accent="teal">
             {loadingImages ? (
