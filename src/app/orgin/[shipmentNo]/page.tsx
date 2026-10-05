@@ -4,15 +4,16 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
-import { getOrginByShipmentNo, getOrginImages, getOdcLotsByShipmentNo } from '@/lib/api';
-import { Orgin, OrginImage, OdcLot } from '@/lib/types';
+import { getOrginByShipmentNo, getOrginImages, getOdcLotsByShipmentNo, getAssetMappingsByShipmentNo } from '@/lib/api';
+import { Orgin, OrginImage, OdcLot, AssetMapping } from '@/lib/types';
 import Spinner from '@/components/ui/Spinner';
 import ShipmentImageGrid from '@/components/ui/ShipmentImageGrid';
+import AssetScanValues from '@/components/ui/AssetScanValues';
 import { SectionCard as Card } from '@/components/ui/SectionCard';
 import { formatDateTime, formatDateOnly } from '@/lib/dateTime';
 import {
   RiArrowLeftLine, RiCheckLine, RiEditLine, RiTruckLine, RiInboxArchiveLine,
-  RiBox3Line, RiImage2Line, RiTimeLine, RiAlertLine, RiRocket2Line,
+  RiBox3Line, RiImage2Line, RiTimeLine, RiAlertLine, RiRocket2Line, RiBarcodeBoxLine,
 } from 'react-icons/ri';
 import type { IconType } from 'react-icons';
 
@@ -74,6 +75,8 @@ export default function ShipmentViewPage() {
   const [loadingImages, setLoadingImages] = useState(true);
   const [odcLots, setOdcLots] = useState<OdcLot[]>([]);
   const [loadingOdcLots, setLoadingOdcLots] = useState(true);
+  const [assets, setAssets] = useState<AssetMapping[]>([]);
+  const [loadingAssets, setLoadingAssets] = useState(true);
 
   useEffect(() => {
     (async () => {
@@ -102,6 +105,15 @@ export default function ShipmentViewPage() {
         setOdcLots(res.data?.data ?? []);
       } catch { toast.error('Failed to load Inward ODC lots'); }
       finally { setLoadingOdcLots(false); }
+    })();
+
+    (async () => {
+      setLoadingAssets(true);
+      try {
+        const res = await getAssetMappingsByShipmentNo(shipmentNo);
+        setAssets(Array.isArray(res.data?.data) ? res.data.data : []);
+      } catch { toast.error('Failed to load asset mapping'); }
+      finally { setLoadingAssets(false); }
     })();
   }, [shipmentNo]);
 
@@ -222,6 +234,26 @@ export default function ShipmentViewPage() {
                   </div>
                 ))}
               </div>
+            )}
+          </Card>
+
+          <Card title={`Asset Mapping${assets.length > 0 ? ` (${assets.length})` : ''}`} icon={RiBarcodeBoxLine} accent="teal">
+            {loadingAssets ? (
+              <div className="py-6 text-center text-slate-400 text-sm">Loading…</div>
+            ) : assets.length === 0 ? (
+              <div data-testid="orgin-view-assets-empty-state" className="py-6 text-center text-slate-400 text-sm">No assets mapped.</div>
+            ) : (
+              <ul data-testid="orgin-view-assets-list" className="space-y-2">
+                {assets.map((a, i) => (
+                  <li key={a.id} data-testid={`orgin-view-asset-${a.id}`}
+                    className="flex items-start gap-3 p-3 bg-teal-50/40 border border-teal-100 rounded-lg">
+                    <span className="px-2 py-0.5 rounded-full bg-teal-100 text-teal-700 text-xs font-bold shrink-0">#{i + 1}</span>
+                    <div className="flex-1 min-w-0">
+                      <AssetScanValues code={a.scanCode} testId={`orgin-view-asset-${a.id}-values`} />
+                    </div>
+                  </li>
+                ))}
+              </ul>
             )}
           </Card>
 

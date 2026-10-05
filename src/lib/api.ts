@@ -35,6 +35,7 @@ export const authenticate = (username: string, password: string) =>
 export const getOrginList = (payload: OrginFilter) => api.post('/getOrgin', payload);
 export const getOrginByShipmentNo = (shipmentNo: string) => api.get(`/getDestination/${shipmentNo}`);
 export const getOdcLotsByShipmentNo = (shipmentNo: string) => api.get(`/getOdcLots/${shipmentNo}`);
+export const getAssetMappingsByShipmentNo = (shipmentNo: string) => api.get(`/getAssetMappings/${shipmentNo}`);
 export const createOrgin = (formData: FormData) =>
   api.post('/createOrgin', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
 export const deleteOrgin = (payload: any) => api.post('/deleteOrgin', payload);

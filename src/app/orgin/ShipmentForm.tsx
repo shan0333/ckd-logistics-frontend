@@ -8,10 +8,11 @@ import {
   createOrgin, getOrginCustomer, getVehicletype, getLocationList, dupCheck, getTransporterMasterList,
   deleteOrginImage,
 } from '@/lib/api';
-import { Orgin, GenericData, Location, Transporter, OdcLot, OrginImage } from '@/lib/types';
+import { Orgin, GenericData, Location, Transporter, OdcLot, OrginImage, AssetMapping } from '@/lib/types';
 import Spinner from '@/components/ui/Spinner';
 import DocumentUpload from '@/components/ui/DocumentUpload';
 import BarcodeScanModal from '@/components/ui/BarcodeScanModal';
+import AssetScanValues from '@/components/ui/AssetScanValues';
 import ShipmentImageGrid from '@/components/ui/ShipmentImageGrid';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { SectionCard, FieldLabel } from '@/components/ui/SectionCard';
@@ -19,6 +20,7 @@ import { tagDocs, tagDocsForLot, tagDocsForExistingLot } from '@/lib/shipmentDoc
 import {
   RiArrowLeftLine, RiQrScan2Line, RiCheckLine, RiCloseLine, RiAddLine,
   RiTruckLine, RiTimeLine, RiImage2Line, RiBox3Line, RiFileAddLine, RiEditLine,
+  RiBarcodeBoxLine, RiArrowGoBackLine,
 } from 'react-icons/ri';
 import { getLocId } from '@/lib/auth';
 
@@ -53,13 +55,16 @@ interface Props {
   /** Required for edit — every document already uploaded for this shipment (LR + per-lot ODC),
    * so existing lots can show/add/remove theirs. */
   existingImages?: OrginImage[];
+  /** Required for edit — assets already mapped to this shipment. They can be removed here; the
+   * removal only takes effect on Save (sent as removed_asset_ids), so Cancel discards it. */
+  existingAssets?: AssetMapping[];
   /** Where "Cancel"/the back link and (for edit) a successful save should return to. */
   returnTo: string;
 }
 
 // Shared by New Shipment (create) and Shipments -> View -> Edit (edit, only offered while
 // curr_status='TRANSIT' — see the backend's org_status='O' guard on UPDATE_ORGIN_DETAILS).
-export default function ShipmentForm({ mode, initial, existingOdcLots, existingImages, returnTo }: Props) {
+export default function ShipmentForm({ mode, initial, existingOdcLots, existingImages, existingAssets, returnTo }: Props) {
   const router = useRouter();
   const locId = getLocId();
 
@@ -93,7 +98,16 @@ export default function ShipmentForm({ mode, initial, existingOdcLots, existingI
   // code, ODC, document can all still be changed after "Add Cabin" — nothing collapses into a
   // read-only summary), so the user can come back and adjust an earlier cabin at any time.
   const [cabinRows, setCabinRows] = useState<CabinRow[]>([{ ...EMPTY_CABIN_ROW }]);
-  const [scanRowIndex, setScanRowIndex] = useState<number | null>(null);
+  // The one camera scanner modal serves both sections: a Cabin row's scan field, or "Scan Asset".
+  const [scanTarget, setScanTarget] = useState<{ kind: 'cabin'; index: number } | { kind: 'asset' } | null>(null);
+
+  // Asset Mapping — newAssetCodes are scans added in this session (not saved yet); in edit mode,
+  // already-saved assets the user removes go into removedAssetIds and are only deleted on Save.
+  const [newAssetCodes, setNewAssetCodes] = useState<string[]>([]);
+  const [removedAssetIds, setRemovedAssetIds] = useState<number[]>([]);
+  const [assetInput, setAssetInput] = useState('');
+  const keptAssets = (existingAssets ?? []).filter((a) => a.id == null || !removedAssetIds.includes(a.id));
+  const assetCount = keptAssets.length + newAssetCodes.length;
 
   // Already-saved lots (edit mode) — their Lot/Scan Code are fixed (recorded at scan time), but
   // the documents attached to them can still be added to or removed, right from this form.
@@ -157,6 +171,23 @@ export default function ShipmentForm({ mode, initial, existingOdcLots, existingI
     setCabinRows((p) => p.filter((_, i) => i !== index));
   };
 
+  // Returns whether the code was added — the same asset can't be mapped twice to one shipment
+  // (checked against saved assets that are still kept, and this session's new scans).
+  const addAssetCode = (raw: string): boolean => {
+    const code = raw.trim();
+    if (!code) return false;
+    if (keptAssets.some((a) => a.scanCode?.trim() === code) || newAssetCodes.includes(code)) {
+      toast.error('This asset is already mapped to the shipment');
+      return false;
+    }
+    setNewAssetCodes((p) => [...p, code]);
+    return true;
+  };
+
+  const addAssetFromInput = () => {
+    if (addAssetCode(assetInput)) setAssetInput('');
+  };
+
   const confirmRemoveImage = async () => {
     const img = imageToRemove;
     if (!img?.id) return;
@@ -203,7 +234,8 @@ export default function ShipmentForm({ mode, initial, existingOdcLots, existingI
       const payload: Orgin = {
         ...org, isfastflag: org.fast_mode === 'Y', transporter_master_id: selectedTransporter.id,
         odc_lots: cabinsToSave.map((r) => ({ lot: r.lot, scanCode: r.scanCode, hasOdc: r.hasOdc ? 'Y' : 'N' })),
-        ...(mode === 'edit' ? { id: initial?.id } : {}),
+        asset_mappings: newAssetCodes.map((scanCode) => ({ scanCode })),
+        ...(mode === 'edit' ? { id: initial?.id, removed_asset_ids: removedAssetIds } : {}),
       };
       const formData = new FormData();
       formData.append('org', JSON.stringify(payload));
@@ -239,9 +271,13 @@ export default function ShipmentForm({ mode, initial, existingOdcLots, existingI
         open={scanModalOpen}
         onClose={() => setScanModalOpen(false)}
         onScan={(code) => {
-          if (scanRowIndex != null) updateCabinRow(scanRowIndex, { scanCode: code });
           setScanModalOpen(false);
-          toast.success('Code scanned');
+          if (scanTarget?.kind === 'cabin') {
+            updateCabinRow(scanTarget.index, { scanCode: code });
+            toast.success('Code scanned');
+          } else if (scanTarget?.kind === 'asset') {
+            if (addAssetCode(code)) toast.success('Asset scanned');
+          }
         }}
       />
 
@@ -425,7 +461,7 @@ export default function ShipmentForm({ mode, initial, existingOdcLots, existingI
                               value={row.scanCode}
                               onChange={e => updateCabinRow(i, { scanCode: e.target.value })} />
                             <button type="button" data-testid={`orgin-modal-cabin-row-${i}-scan-camera-button`}
-                              onClick={() => { setScanRowIndex(i); setScanModalOpen(true); }}
+                              onClick={() => { setScanTarget({ kind: 'cabin', index: i }); setScanModalOpen(true); }}
                               className="flex items-center gap-2 px-4 py-2 border border-slate-300 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50 shrink-0">
                               <RiQrScan2Line className="w-4 h-4" />
                             </button>
@@ -481,6 +517,86 @@ export default function ShipmentForm({ mode, initial, existingOdcLots, existingI
               )}
             </div>
           </>
+        </SectionCard>
+
+        <SectionCard title={`Asset Mapping${assetCount > 0 ? ` (${assetCount})` : ''}`} icon={RiBarcodeBoxLine} accent="teal" className="lg:col-span-2">
+          <div data-testid="orgin-modal-asset-section">
+            {assetCount === 0 && removedAssetIds.length === 0 && (
+              <p data-testid="orgin-modal-asset-empty-state" className="text-sm text-slate-400 mb-3">
+                No assets mapped yet. Click Add Asset to scan an asset&apos;s barcode or QR code.
+              </p>
+            )}
+
+            <ul data-testid="orgin-modal-asset-list" className="space-y-2 mb-3">
+              {keptAssets.map((a, i) => (
+                <li key={`saved-${a.id}`} data-testid={`orgin-modal-asset-saved-${a.id}`}
+                  className="flex items-start gap-3 p-3 bg-teal-50/40 border border-teal-100 rounded-lg">
+                  <span className="px-2 py-0.5 rounded-full bg-teal-100 text-teal-700 text-xs font-bold shrink-0">#{i + 1}</span>
+                  <div className="flex-1 min-w-0">
+                    <AssetScanValues code={a.scanCode} testId={`orgin-modal-asset-saved-${a.id}-values`} />
+                  </div>
+                  <button type="button" data-testid={`orgin-modal-asset-saved-${a.id}-remove-button`}
+                    onClick={() => a.id != null && setRemovedAssetIds((p) => [...p, a.id!])}
+                    aria-label={`Remove asset ${i + 1}`} className="text-slate-400 hover:text-red-600 shrink-0">
+                    <RiCloseLine className="w-4 h-4" />
+                  </button>
+                </li>
+              ))}
+              {newAssetCodes.map((code, j) => (
+                <li key={`new-${code}`} data-testid={`orgin-modal-asset-new-${j}`}
+                  className="flex items-start gap-3 p-3 bg-teal-50/40 border border-teal-100 rounded-lg">
+                  <span className="px-2 py-0.5 rounded-full bg-teal-100 text-teal-700 text-xs font-bold shrink-0">#{keptAssets.length + j + 1}</span>
+                  <div className="flex-1 min-w-0">
+                    <AssetScanValues code={code} testId={`orgin-modal-asset-new-${j}-values`} />
+                    {mode === 'edit' && <p className="text-[11px] text-teal-700 font-semibold mt-1">New — saved when you click Save Changes</p>}
+                  </div>
+                  <button type="button" data-testid={`orgin-modal-asset-new-${j}-remove-button`}
+                    onClick={() => setNewAssetCodes((p) => p.filter((_, k) => k !== j))}
+                    aria-label={`Remove asset ${keptAssets.length + j + 1}`} className="text-slate-400 hover:text-red-600 shrink-0">
+                    <RiCloseLine className="w-4 h-4" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+
+            {removedAssetIds.length > 0 && (
+              <div data-testid="orgin-modal-asset-removed" className="mb-3 p-3 border border-dashed border-red-200 bg-red-50/40 rounded-lg">
+                <p className="text-xs font-semibold text-red-700 mb-2">
+                  {removedAssetIds.length} asset{removedAssetIds.length > 1 ? 's' : ''} will be removed when you save
+                </p>
+                <ul className="space-y-1">
+                  {(existingAssets ?? []).filter((a) => a.id != null && removedAssetIds.includes(a.id)).map((a) => (
+                    <li key={`removed-${a.id}`} className="flex items-center gap-2 text-xs">
+                      <span className="font-mono text-slate-500 line-through break-all flex-1">{a.scanCode}</span>
+                      <button type="button" data-testid={`orgin-modal-asset-removed-${a.id}-undo-button`}
+                        onClick={() => setRemovedAssetIds((p) => p.filter((id) => id !== a.id))}
+                        className="flex items-center gap-1 text-blue-600 font-semibold hover:underline shrink-0">
+                        <RiArrowGoBackLine className="w-3.5 h-3.5" /> Undo
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            <div className="flex flex-wrap items-center gap-2">
+              <button type="button" data-testid="orgin-modal-asset-scan-button"
+                onClick={() => { setScanTarget({ kind: 'asset' }); setScanModalOpen(true); }}
+                className="flex items-center gap-2 px-4 py-2 border border-blue-600 text-blue-600 text-sm font-semibold rounded-lg hover:bg-blue-50">
+                <RiQrScan2Line className="w-4 h-4" /> Add Asset
+              </button>
+              <span className="text-xs text-slate-400">or</span>
+              <input data-testid="orgin-modal-asset-input" className={SEL + ' flex-1 min-w-[220px]'}
+                placeholder="Use a handheld scanner, or type the code and press Enter…"
+                value={assetInput}
+                onChange={e => setAssetInput(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addAssetFromInput(); } }} />
+              <button type="button" data-testid="orgin-modal-asset-add-button" onClick={addAssetFromInput} disabled={!assetInput.trim()}
+                className="flex items-center gap-2 px-4 py-2 border border-slate-300 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed">
+                <RiAddLine className="w-4 h-4" /> Add Code
+              </button>
+            </div>
+          </div>
         </SectionCard>
       </div>
 

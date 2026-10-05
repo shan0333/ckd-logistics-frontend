@@ -4,8 +4,8 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
-import { getOrginByShipmentNo, getOdcLotsByShipmentNo, getOrginImages } from '@/lib/api';
-import { Orgin, OdcLot, OrginImage } from '@/lib/types';
+import { getOrginByShipmentNo, getOdcLotsByShipmentNo, getOrginImages, getAssetMappingsByShipmentNo } from '@/lib/api';
+import { Orgin, OdcLot, OrginImage, AssetMapping } from '@/lib/types';
 import Spinner from '@/components/ui/Spinner';
 import ShipmentForm from '../../ShipmentForm';
 import { RiArrowLeftLine } from 'react-icons/ri';
@@ -18,19 +18,22 @@ export default function EditShipmentPage() {
   const [row, setRow] = useState<Orgin | null>(null);
   const [odcLots, setOdcLots] = useState<OdcLot[]>([]);
   const [images, setImages] = useState<OrginImage[]>([]);
+  const [assets, setAssets] = useState<AssetMapping[]>([]);
 
   useEffect(() => {
     (async () => {
       setLoading(true);
       try {
-        const [orginRes, odcLotsRes, imagesRes] = await Promise.all([
+        const [orginRes, odcLotsRes, imagesRes, assetsRes] = await Promise.all([
           getOrginByShipmentNo(shipmentNo),
           getOdcLotsByShipmentNo(shipmentNo),
           getOrginImages(shipmentNo, 'ORGIN'),
+          getAssetMappingsByShipmentNo(shipmentNo),
         ]);
         setRow(orginRes.data?.data?.[0] ?? null);
         setOdcLots(odcLotsRes.data?.data ?? []);
         setImages(imagesRes.data?.data ?? []);
+        setAssets(Array.isArray(assetsRes.data?.data) ? assetsRes.data.data : []);
       } catch { toast.error('Failed to load shipment'); }
       finally { setLoading(false); }
     })();
@@ -58,7 +61,7 @@ export default function EditShipmentPage() {
   }
 
   return (
-    <ShipmentForm mode="edit" initial={row} existingOdcLots={odcLots} existingImages={images}
+    <ShipmentForm mode="edit" initial={row} existingOdcLots={odcLots} existingImages={images} existingAssets={assets}
       returnTo={`/orgin/${encodeURIComponent(shipmentNo)}`} />
   );
 }

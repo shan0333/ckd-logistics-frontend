@@ -38,6 +38,11 @@ export interface Orgin {
   // any additional ones beyond what's already saved). Never populated on read — fetch existing
   // scans separately via getOdcLotsByShipmentNo.
   odc_lots?: OdcLot[];
+  // Write-only — Asset Mapping. asset_mappings: NEW asset scans in this request; removed_asset_ids:
+  // already-saved asset ids the user removed in Edit (applied by the backend on save). Never
+  // populated on read — fetch saved assets via getAssetMappingsByShipmentNo.
+  asset_mappings?: AssetMapping[];
+  removed_asset_ids?: number[];
   fast_mode_applicable_or_not?: 'Y' | 'N';
   delay_applicable_or_not?: 'Y' | 'N';
   vehicle_reported_on?: string;
@@ -84,6 +89,17 @@ export interface OdcLot {
   lot?: string;
   scanCode?: string;
   hasOdc?: 'Y' | 'N';
+  createdBy?: number;
+  createdDate?: string;
+}
+
+// One scanned asset mapped to a shipment (orgin_asset) — Matches Logistics-backend's
+// AssetMapping.java (camelCase both ways). scanCode is the raw barcode/QR text; see
+// lib/assetScan.ts for how structured codes are broken out into readable values.
+export interface AssetMapping {
+  id?: number;
+  orginId?: number;
+  scanCode?: string;
   createdBy?: number;
   createdDate?: string;
 }
