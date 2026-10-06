@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { OrginFilter, Transporter } from './types';
+import type { OrginFilter, ReportFilter, Transporter } from './types';
 
 // Same-origin /api on spaceageconnect.com routes to the same Logistics-backend the CKD app
 // already uses (nginx's /api location isn't scoped per Referer path except for the legacy
@@ -67,6 +67,16 @@ export const updateBillingDetails = (formData: FormData) =>
 
 // ─── Dashboard / Report ──────────────────────────────────────────────────────
 export const getShipmentGraphInfo = (payload: OrginFilter) => api.post('/shipmentGraphInfo', payload);
+// Reports menu (Shipment / ODC / SOF / Asset) — see Logistics-backend ReportsController.
+export const downloadShipmentReport = (filter: ReportFilter, format: 'xlsx' | 'pdf') =>
+  api.post('/reports/shipment', filter, { params: { format }, responseType: 'blob' });
+export const downloadOdcReport = (filter: ReportFilter) =>
+  api.post('/reports/odc', filter, { responseType: 'blob' });
+export const downloadSofReport = (shipmentNo: string) =>
+  api.get(`/reports/sof/${encodeURIComponent(shipmentNo)}`, { responseType: 'blob' });
+export const getAssetReport = (q: string) => api.get('/reports/asset', { params: { q } });
+export const searchShipmentNumbers = (q: string, limit = 20) =>
+  api.get('/reports/shipmentNumbers', { params: { q, limit } });
 export const downloadLogReport = (filter: OrginFilter) =>
   api.get('/logDownload', {
     headers: { filter: JSON.stringify(filter) },

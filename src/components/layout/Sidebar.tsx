@@ -12,16 +12,34 @@ import {
   RiMenuLine,
   RiCloseLine,
   RiLogoutBoxLine,
+  RiArrowDownSLine,
+  RiTruckFill,
+  RiBox3Line,
+  RiBarcodeBoxLine,
+  RiFileShieldLine,
 } from 'react-icons/ri';
-import { clearSession } from '@/lib/auth';
+import type { IconType } from 'react-icons';
+import { clearSession, isAdmin } from '@/lib/auth';
 import { useEffect, useState } from 'react';
 import clsx from 'clsx';
 
-const NAV_ITEMS = [
+interface NavItem { label: string; href: string; icon: IconType; testId: string; adminOnly?: boolean }
+
+const NAV_ITEMS: (NavItem | { label: string; icon: IconType; testId: string; base: string; children: NavItem[] })[] = [
   { label: 'Dashboard', href: '/dashboard',   icon: RiDashboardLine,      testId: 'nav-dashboard' },
   { label: 'Shipments', href: '/orgin',       icon: RiTruckLine,          testId: 'nav-orgin' },
   { label: 'Receiving', href: '/destination', icon: RiInboxUnarchiveLine, testId: 'nav-destination' },
-  { label: 'Report',    href: '/report',      icon: RiFileChart2Line,     testId: 'nav-report' },
+  {
+    label: 'Reports', icon: RiFileChart2Line, testId: 'nav-report', base: '/report',
+    children: [
+      { label: 'Shipment Report', href: '/report/shipment', icon: RiTruckFill,      testId: 'nav-report-shipment' },
+      { label: 'ODC Report',      href: '/report/odc',      icon: RiBox3Line,       testId: 'nav-report-odc' },
+      { label: 'Asset Report',    href: '/report/asset',    icon: RiBarcodeBoxLine, testId: 'nav-report-asset' },
+      // SOF carries billing + full history — hidden for non-admins here, and the backend
+      // (/reports/sof) rejects them too.
+      { label: 'SOF',             href: '/report/sof',      icon: RiFileShieldLine, testId: 'nav-report-sof', adminOnly: true },
+    ],
+  },
   { label: 'Transporters', href: '/transporter-master', icon: RiContactsLine, testId: 'nav-transporter-master' },
   { label: 'Billing', href: '/billing-details', icon: RiBillLine, testId: 'nav-billing-details' },
 ];
@@ -32,6 +50,15 @@ export default function Sidebar() {
   useEffect(() => { setMounted(true); }, []);
   const pathname = usePathname();
   const router = useRouter();
+  const admin = mounted && isAdmin();
+  // A group starts expanded whenever one of its pages is open; the user can still toggle it.
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const isActive = (href: string) => mounted && (pathname === href || pathname.startsWith(href + '/'));
+  const linkClass = (active: boolean, nested = false) => clsx(
+    'flex items-center gap-3 rounded-lg text-sm font-medium transition-colors',
+    nested ? 'pl-9 pr-3 py-2' : 'px-3 py-2.5',
+    active ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-700 hover:text-white'
+  );
 
   const handleLogout = () => {
     clearSession();
@@ -41,23 +68,46 @@ export default function Sidebar() {
 
   const NavLinks = () => (
     <nav className="flex flex-col gap-1 flex-1 px-2 py-4">
-      {NAV_ITEMS.map(({ label, href, icon: Icon, testId }) => (
-        <Link
-          key={href}
-          href={href}
-          data-testid={testId}
-          onClick={() => setOpen(false)}
-          className={clsx(
-            'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
-            mounted && (pathname === href || pathname.startsWith(href + '/'))
-              ? 'bg-blue-600 text-white'
-              : 'text-slate-300 hover:bg-slate-700 hover:text-white'
-          )}
-        >
-          <Icon className="w-5 h-5 shrink-0" />
-          <span className="whitespace-nowrap">{label}</span>
-        </Link>
-      ))}
+      {NAV_ITEMS.map((item) => {
+        if ('children' in item) {
+          const Icon = item.icon;
+          // pathname is the same on server and client, so this needs no `mounted` guard — the
+          // group is already open on first paint when one of its pages is showing.
+          const inGroup = pathname === item.base || pathname.startsWith(item.base + '/');
+          const isOpen = expanded[item.base] ?? inGroup;
+          const children = item.children.filter((c) => !c.adminOnly || admin);
+          return (
+            <div key={item.base}>
+              <button type="button" data-testid={item.testId} aria-expanded={isOpen}
+                onClick={() => setExpanded((p) => ({ ...p, [item.base]: !isOpen }))}
+                className={clsx(linkClass(false), 'w-full', inGroup && 'text-white')}>
+                <Icon className="w-5 h-5 shrink-0" />
+                <span className="whitespace-nowrap flex-1 text-left">{item.label}</span>
+                <RiArrowDownSLine className={clsx('w-4 h-4 transition-transform', isOpen && 'rotate-180')} />
+              </button>
+              {isOpen && (
+                <div className="flex flex-col gap-1 mt-1">
+                  {children.map(({ label, href, icon: ChildIcon, testId }) => (
+                    <Link key={href} href={href} data-testid={testId} onClick={() => setOpen(false)}
+                      className={linkClass(isActive(href), true)}>
+                      <ChildIcon className="w-4 h-4 shrink-0" />
+                      <span className="whitespace-nowrap">{label}</span>
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        }
+        const { label, href, icon: Icon, testId } = item;
+        return (
+          <Link key={href} href={href} data-testid={testId} onClick={() => setOpen(false)}
+            className={linkClass(isActive(href))}>
+            <Icon className="w-5 h-5 shrink-0" />
+            <span className="whitespace-nowrap">{label}</span>
+          </Link>
+        );
+      })}
 
       <button
         data-testid="nav-logout"

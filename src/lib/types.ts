@@ -170,6 +170,37 @@ export interface EligibleShipment {
   lr_date?: string;
 }
 
+// Matches Logistics-backend's ReportFilter.java (Reports menu). Every field optional.
+export type ReportDateType = 'LR' | 'ETA' | 'ATA' | 'CREATED';
+export interface ReportFilter {
+  statuses?: string[];
+  dateType?: ReportDateType;
+  fromDate?: string; // yyyy-MM-dd
+  toDate?: string;
+  shipmentNos?: string[];
+  transporters?: string[];
+  odcType?: 'INWARD' | 'RECEIVING' | 'BOTH'; // ODC report only
+}
+
+// One asset from /reports/asset — current mapping(s) + full history (newest first).
+export interface AssetMappingEntry {
+  shipmentNo?: string;
+  shipmentStatus?: string;
+  routeFrom?: string;
+  routeTo?: string;
+  vehicleNo?: string;
+  mappedDate?: string;
+  mappedBy?: string;
+  removedDate?: string | null;
+  removedBy?: string | null;
+}
+export interface AssetReportItem {
+  scanCode: string;
+  status: 'NOT MAPPED' | 'IN TRANSIT' | 'AT DESTINATION';
+  current: AssetMappingEntry[];
+  history: AssetMappingEntry[];
+}
+
 export interface OrginFilter {
   fromDate?: string;
   toDate?: string;
