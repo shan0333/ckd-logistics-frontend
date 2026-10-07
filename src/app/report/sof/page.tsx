@@ -1,5 +1,6 @@
 'use client';
 
+import { withReportEnabled } from '@/components/reports/ReportGate';
 import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import { downloadSofReport } from '@/lib/api';
@@ -16,7 +17,7 @@ const SECTIONS = ['Shipment details', 'Key dates (LR, ETA, ATA, delay)', 'Receiv
   'All documents', 'Asset mapping (current and removed)', 'Billing (transporter & customer, margin)', 'Full event timeline'];
 
 // Statement of Facts — admin only (the sidebar hides it for others and the backend returns 403).
-export default function SofReportPage() {
+function SofReportPage() {
   const [mounted, setMounted] = useState(false);
   const [picked, setPicked] = useState<string[]>([]);
   const shipmentNo = picked[0] ?? '';
@@ -81,3 +82,6 @@ export default function SofReportPage() {
     </div>
   );
 }
+
+// Hidden until management sign-off — see lib/features.ts.
+export default withReportEnabled('sof', SofReportPage);

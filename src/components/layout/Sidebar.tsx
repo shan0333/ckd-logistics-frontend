@@ -20,10 +20,11 @@ import {
 } from 'react-icons/ri';
 import type { IconType } from 'react-icons';
 import { clearSession, isAdmin } from '@/lib/auth';
+import { isReportEnabled, type ReportKey } from '@/lib/features';
 import { useEffect, useState } from 'react';
 import clsx from 'clsx';
 
-interface NavItem { label: string; href: string; icon: IconType; testId: string; adminOnly?: boolean }
+interface NavItem { label: string; href: string; icon: IconType; testId: string; adminOnly?: boolean; reportKey?: ReportKey }
 
 const NAV_ITEMS: (NavItem | { label: string; icon: IconType; testId: string; base: string; children: NavItem[] })[] = [
   { label: 'Dashboard', href: '/dashboard',   icon: RiDashboardLine,      testId: 'nav-dashboard' },
@@ -32,12 +33,12 @@ const NAV_ITEMS: (NavItem | { label: string; icon: IconType; testId: string; bas
   {
     label: 'Reports', icon: RiFileChart2Line, testId: 'nav-report', base: '/report',
     children: [
-      { label: 'Shipment Report', href: '/report/shipment', icon: RiTruckFill,      testId: 'nav-report-shipment' },
-      { label: 'ODC Report',      href: '/report/odc',      icon: RiBox3Line,       testId: 'nav-report-odc' },
-      { label: 'Asset Report',    href: '/report/asset',    icon: RiBarcodeBoxLine, testId: 'nav-report-asset' },
+      { label: 'Shipment Report', href: '/report/shipment', icon: RiTruckFill,      testId: 'nav-report-shipment', reportKey: 'shipment' },
+      { label: 'ODC Report',      href: '/report/odc',      icon: RiBox3Line,       testId: 'nav-report-odc', reportKey: 'odc' },
+      { label: 'Asset Report',    href: '/report/asset',    icon: RiBarcodeBoxLine, testId: 'nav-report-asset', reportKey: 'asset' },
       // SOF carries billing + full history — hidden for non-admins here, and the backend
       // (/reports/sof) rejects them too.
-      { label: 'SOF',             href: '/report/sof',      icon: RiFileShieldLine, testId: 'nav-report-sof', adminOnly: true },
+      { label: 'SOF',             href: '/report/sof',      icon: RiFileShieldLine, testId: 'nav-report-sof', adminOnly: true, reportKey: 'sof' },
     ],
   },
   { label: 'Transporters', href: '/transporter-master', icon: RiContactsLine, testId: 'nav-transporter-master' },
@@ -75,7 +76,18 @@ export default function Sidebar() {
           // group is already open on first paint when one of its pages is showing.
           const inGroup = pathname === item.base || pathname.startsWith(item.base + '/');
           const isOpen = expanded[item.base] ?? inGroup;
-          const children = item.children.filter((c) => !c.adminOnly || admin);
+          const children = item.children.filter((c) => (!c.adminOnly || admin) && (!c.reportKey || isReportEnabled(c.reportKey)));
+          // Only one report switched on (lib/features.ts) — a one-item dropdown is pointless, so the
+          // group shows as a plain link to it instead.
+          if (children.length === 1) {
+            return (
+              <Link key={item.base} href={children[0].href} data-testid={item.testId} onClick={() => setOpen(false)}
+                className={linkClass(isActive(item.base))}>
+                <Icon className="w-5 h-5 shrink-0" />
+                <span className="whitespace-nowrap">{item.label}</span>
+              </Link>
+            );
+          }
           return (
             <div key={item.base}>
               <button type="button" data-testid={item.testId} aria-expanded={isOpen}

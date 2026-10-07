@@ -1,5 +1,6 @@
 'use client';
 
+import { withReportEnabled } from '@/components/reports/ReportGate';
 import { useState } from 'react';
 import clsx from 'clsx';
 import toast from 'react-hot-toast';
@@ -19,7 +20,7 @@ const ODC_TYPES: { value: OdcType; label: string; hint: string; icon: IconType }
   { value: 'RECEIVING', label: 'Receiving ODC', hint: 'ODC documents uploaded at Receiving', icon: RiInboxArchiveLine },
 ];
 
-export default function OdcReportPage() {
+function OdcReportPage() {
   const [filter, setFilter] = useState<ReportFilter>(emptyReportFilter({ odcType: 'BOTH' }));
   const [busy, setBusy] = useState(false);
   const type = filter.odcType ?? 'BOTH';
@@ -81,3 +82,6 @@ export default function OdcReportPage() {
     </div>
   );
 }
+
+// Hidden until management sign-off — see lib/features.ts.
+export default withReportEnabled('odc', OdcReportPage);

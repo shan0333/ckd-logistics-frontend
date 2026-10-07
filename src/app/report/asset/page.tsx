@@ -1,5 +1,6 @@
 'use client';
 
+import { withReportEnabled } from '@/components/reports/ReportGate';
 import { useCallback, useState } from 'react';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
@@ -27,7 +28,7 @@ function ShipmentLink({ e }: { e: AssetMappingEntry }) {
   );
 }
 
-export default function AssetReportPage() {
+function AssetReportPage() {
   const [code, setCode] = useState('');
   const [scanOpen, setScanOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -158,3 +159,6 @@ export default function AssetReportPage() {
     </div>
   );
 }
+
+// Hidden until management sign-off — see lib/features.ts.
+export default withReportEnabled('asset', AssetReportPage);
