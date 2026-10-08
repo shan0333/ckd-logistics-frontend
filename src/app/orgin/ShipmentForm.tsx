@@ -13,6 +13,7 @@ import Spinner from '@/components/ui/Spinner';
 import DocumentUpload from '@/components/ui/DocumentUpload';
 import BarcodeScanModal from '@/components/ui/BarcodeScanModal';
 import AssetScanValues from '@/components/ui/AssetScanValues';
+import TrackingLink, { trackingHref } from '@/components/ui/TrackingLink';
 import ShipmentImageGrid from '@/components/ui/ShipmentImageGrid';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { SectionCard, FieldLabel } from '@/components/ui/SectionCard';
@@ -26,7 +27,7 @@ import { getLocId } from '@/lib/auth';
 
 const EMPTY_ORG: Orgin = {
   shipment_no: '', vehicle_no: '', lr_no: '', lr_date: '',
-  transporter_name: '', transit_days: '', fast_mode: 'N',
+  transporter_name: '', transit_days: '', fast_mode: 'N', tracking_link: '',
   odc: 'N',
   customer_id: '', shipment_route_from_id: '', shipment_route_to_id: '',
   vehicle_type: '', flag: 'O',
@@ -82,6 +83,10 @@ export default function ShipmentForm({ mode, initial, existingOdcLots, existingI
     // Origin side, so it's always 'O', regardless of what `initial` contains.
     flag: 'O',
     ...(initial ? { vehicle_type: initial.vehicle_id ?? initial.vehicle_type ?? '' } : {}),
+    // The API returns lr_date as "yyyy-MM-dd HH:mm:ss", but <input type="date"> only accepts
+    // "yyyy-MM-dd" — without trimming, Edit opened with LR Date blank and every save failed
+    // "LR Date is required" until the user re-picked the date.
+    ...(initial?.lr_date ? { lr_date: initial.lr_date.slice(0, 10) } : {}),
   });
   const [lrFiles, setLrFiles] = useState<File[]>([]);
   const [dupWarning, setDupWarning] = useState(false);
@@ -215,6 +220,10 @@ export default function ShipmentForm({ mode, initial, existingOdcLots, existingI
     const selectedTransporter = transporters.find((t) => t.name === org.transporter_name);
     if (!selectedTransporter?.id) { toast.error('Please pick a transporter from the list'); return; }
     if (mode === 'create' && dupWarning) { toast.error('This Shipment No already exists'); return; }
+    if (org.tracking_link?.trim() && !trackingHref(org.tracking_link)) {
+      toast.error('Tracking Link must be a web address (e.g. https://…)');
+      return;
+    }
     // LR Document is mandatory at creation only — not re-enforced on edit, since shipments
     // created before this rule existed have no LR doc on file and would otherwise become
     // permanently uneditable.
@@ -382,6 +391,17 @@ export default function ShipmentForm({ mode, initial, existingOdcLots, existingI
               <FieldLabel>LR Date</FieldLabel>
               <input type="date" data-testid="orgin-modal-lr-date-input" className={SEL} value={org.lr_date ?? ''}
                 onChange={e => setOrg(p => ({ ...p, lr_date: e.target.value }))} />
+            </div>
+            <div className="sm:col-span-2">
+              <FieldLabel>Tracking Link</FieldLabel>
+              <div className="flex items-center gap-2">
+                <input data-testid="orgin-modal-tracking-link-input" type="url" inputMode="url" maxLength={1000}
+                  className={SEL} placeholder="Optional — e.g. https://tracking.example.com/…" value={org.tracking_link ?? ''}
+                  onChange={e => setOrg(p => ({ ...p, tracking_link: e.target.value }))} />
+                {trackingHref(org.tracking_link) && (
+                  <span className="shrink-0"><TrackingLink link={org.tracking_link} testId="orgin-modal-tracking-link-open" compact /></span>
+                )}
+              </div>
             </div>
             <div>
               <FieldLabel>Fast Mode</FieldLabel>

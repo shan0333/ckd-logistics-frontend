@@ -34,6 +34,7 @@ const NAV_ITEMS: (NavItem | { label: string; icon: IconType; testId: string; bas
     label: 'Reports', icon: RiFileChart2Line, testId: 'nav-report', base: '/report',
     children: [
       { label: 'Shipment Report', href: '/report/shipment', icon: RiTruckFill,      testId: 'nav-report-shipment', reportKey: 'shipment' },
+      { label: 'Billing Report',  href: '/report/billing',  icon: RiBillLine,       testId: 'nav-report-billing', reportKey: 'billing' },
       { label: 'ODC Report',      href: '/report/odc',      icon: RiBox3Line,       testId: 'nav-report-odc', reportKey: 'odc' },
       { label: 'Asset Report',    href: '/report/asset',    icon: RiBarcodeBoxLine, testId: 'nav-report-asset', reportKey: 'asset' },
       // SOF carries billing + full history — hidden for non-admins here, and the backend

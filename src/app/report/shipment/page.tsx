@@ -49,14 +49,14 @@ export default function ShipmentReportPage() {
           <RiPieChart2Line className="w-5 h-5 text-blue-500 shrink-0 mt-0.5" />
           <div>
             <div className="text-sm font-semibold text-slate-700">Summary</div>
-            <p className="text-xs text-slate-500 mt-0.5">Total shipments, count per status, ODC shipments, assets mapped, on-time vs late (ATA vs ETA) with average delay, and a transporter-wise table.</p>
+            <p className="text-xs text-slate-500 mt-0.5">Total shipments, count per status, ODC shipments, assets mapped, on-time vs late (Vehicle Reported Time vs ETA) with average delay, and a transporter-wise table.</p>
           </div>
         </div>
         <div className="bg-white rounded-xl border border-slate-200 p-4 flex gap-3">
           <RiListCheck2 className="w-5 h-5 text-blue-500 shrink-0 mt-0.5" />
           <div>
             <div className="text-sm font-semibold text-slate-700">Shipment breakup</div>
-            <p className="text-xs text-slate-500 mt-0.5">One row per shipment: status, customer, route, vehicle, LR, ETA, ATA, delay, transporter, cabins/ODC, assets, created by/date. Excel has every column with filters on the header row.</p>
+            <p className="text-xs text-slate-500 mt-0.5">One row per shipment: status, customer, route, vehicle, LR, ETA, Vehicle Reported Time, received by, delay, transporter, cabins/ODC, assets, created by/date. Excel has every column with filters on the header row.</p>
           </div>
         </div>
       </div>

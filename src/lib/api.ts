@@ -70,6 +70,8 @@ export const getShipmentGraphInfo = (payload: OrginFilter) => api.post('/shipmen
 // Reports menu (Shipment / ODC / SOF / Asset) — see Logistics-backend ReportsController.
 export const downloadShipmentReport = (filter: ReportFilter, format: 'xlsx' | 'pdf') =>
   api.post('/reports/shipment', filter, { params: { format }, responseType: 'blob' });
+export const downloadBillingReport = (filter: ReportFilter, format: 'xlsx' | 'pdf') =>
+  api.post('/reports/billing', filter, { params: { format }, responseType: 'blob' });
 export const downloadOdcReport = (filter: ReportFilter) =>
   api.post('/reports/odc', filter, { responseType: 'blob' });
 export const downloadSofReport = (shipmentNo: string) =>

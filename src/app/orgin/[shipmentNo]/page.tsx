@@ -9,6 +9,7 @@ import { Orgin, OrginImage, OdcLot, AssetMapping } from '@/lib/types';
 import Spinner from '@/components/ui/Spinner';
 import ShipmentImageGrid from '@/components/ui/ShipmentImageGrid';
 import AssetScanValues from '@/components/ui/AssetScanValues';
+import TrackingLink from '@/components/ui/TrackingLink';
 import { SectionCard as Card } from '@/components/ui/SectionCard';
 import { formatDateTime, formatDateOnly } from '@/lib/dateTime';
 import {
@@ -170,6 +171,10 @@ export default function ShipmentViewPage() {
               <Field label="LR Date" value={formatDateOnly(row.lr_date)} />
               <Field label="Transit Days" value={row.transit_days} />
               <Field label="Transporter" value={transporterDisplayName(row)} />
+              <div className="col-span-2 min-w-0">
+                <div className="text-[11px] font-bold uppercase tracking-wide text-slate-400">Tracking Link</div>
+                <div className="mt-0.5"><TrackingLink link={row.tracking_link} testId="orgin-view-tracking-link" /></div>
+              </div>
               <Field label="Fast Mode"
                 badge={row.fast_mode === 'Y'
                   ? { text: 'Yes', color: 'green' }

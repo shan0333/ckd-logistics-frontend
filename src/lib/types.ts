@@ -23,6 +23,9 @@ export interface Orgin {
   vehicle_type?: string;    // read: display name; write: generic_data id (category='VEHICLE_TYPE') as a string
   vehicle_id?: string;      // read-only: vehicle type's numeric id
   vehicle_no?: string;
+  // Optional transporter tracking URL — only http/https is saved (backend normalizes
+  // "www.x.com" to "https://www.x.com" and rejects anything else).
+  tracking_link?: string;
   lr_no?: string;
   lr_date?: string;
   transporter_name?: string;        // denormalized snapshot; prefer transporter_master_name for display
@@ -137,6 +140,8 @@ export interface Transporter {
 // totalBillingAmount/customerTotalAmount/shipmentNo are read-only, computed/joined server-side.
 export interface BillingDetails {
   id?: number;
+  transporterRemarks?: string; // optional, Transporter Billing section (max 1000)
+  customerRemarks?: string;    // optional, Customer Billing section (max 1000)
   orginId?: number;
   shipmentNo?: string;
   grnNumber?: string;

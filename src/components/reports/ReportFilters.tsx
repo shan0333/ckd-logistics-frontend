@@ -17,7 +17,7 @@ const STATUS_DOT: Record<string, string> = {
 const DATE_TYPES: { value: ReportDateType; label: string; hint: string }[] = [
   { value: 'LR', label: 'LR Date', hint: 'Shipment (LR) date' },
   { value: 'ETA', label: 'ETA', hint: 'LR Date + Transit Days' },
-  { value: 'ATA', label: 'ATA', hint: 'Vehicle Reported On (Receiving)' },
+  { value: 'ATA', label: 'Vehicle Reported', hint: 'Vehicle Reported Time (entered at Receiving)' },
   { value: 'CREATED', label: 'Created', hint: 'When the shipment was entered (older shipments: LR Date)' },
 ];
 

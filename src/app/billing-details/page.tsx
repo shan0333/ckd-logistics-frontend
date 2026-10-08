@@ -22,6 +22,7 @@ const EMPTY: BillingDetails = {
   orginId: undefined, grnNumber: '', podStatus: '', invoiceNumber: '', invoiceDate: '',
   baseFare: '', haltingCharges: '', customerInvoiceNo: '', customerInvoiceDate: '',
   customerBaseFare: '', customerHaltingCharges: '', status: 'DRAFT',
+  transporterRemarks: '', customerRemarks: '',
 };
 
 const money = (v: unknown) => {
@@ -361,6 +362,12 @@ export default function BillingDetailsPage() {
                 value={total(form.baseFare, form.haltingCharges)} readOnly />
             </div>
             <div className="sm:col-span-2">
+              <label className="block text-sm font-medium text-slate-700 mb-1">Remarks</label>
+              <textarea data-testid="billing-modal-transporter-remarks-input" disabled={formLocked} rows={2} maxLength={1000}
+                className={SEL} placeholder="Optional"
+                value={form.transporterRemarks ?? ''} onChange={e => setForm(p => ({ ...p, transporterRemarks: e.target.value }))} />
+            </div>
+            <div className="sm:col-span-2">
               {loadingBillingDocs ? (
                 <p className="text-xs text-slate-400">Loading document…</p>
               ) : existingBillingDocs.length > 0 ? (
@@ -405,6 +412,12 @@ export default function BillingDetailsPage() {
               <label className="block text-sm font-medium text-slate-700 mb-1">Total Amount</label>
               <input data-testid="billing-modal-total-amount" disabled className={SEL + ' font-semibold'}
                 value={total(form.customerBaseFare, form.customerHaltingCharges)} readOnly />
+            </div>
+            <div className="sm:col-span-2">
+              <label className="block text-sm font-medium text-slate-700 mb-1">Remarks</label>
+              <textarea data-testid="billing-modal-customer-remarks-input" disabled={formLocked} rows={2} maxLength={1000}
+                className={SEL} placeholder="Optional"
+                value={form.customerRemarks ?? ''} onChange={e => setForm(p => ({ ...p, customerRemarks: e.target.value }))} />
             </div>
           </div>
         </div>
