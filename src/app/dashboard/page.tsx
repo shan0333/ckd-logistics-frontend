@@ -66,7 +66,7 @@ function SummaryCards({ sectionRef }: { sectionRef: (el: HTMLElement | null) => 
       <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
         <div>
           <h2 className="text-sm font-bold text-slate-800">Summary</h2>
-          <p className="text-xs text-slate-500 mt-0.5">Shipments with LR date {periodCaption(period)}</p>
+          <p className="text-xs text-slate-500 mt-0.5">{periodCaption(period)} · Received / Receiving ODC by vehicle reported date, others by LR date</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <div className="pdf-hide"><PeriodFilter value={period} onChange={setPeriod} testId="dash-cards-period" /></div>
@@ -82,10 +82,10 @@ function SummaryCards({ sectionRef }: { sectionRef: (el: HTMLElement | null) => 
           <Tile testId="dash-card-total" icon={RiTruckLine} label="Total Shipments" value={num(data.total)} />
           <Tile testId="dash-card-intransit" icon={RiRouteLine} tone="orange" label="In Transit" value={num(data.inTransit)}
             hint={data.overdue ? `incl. ${num(data.overdue)} overdue` : 'vehicle not reported yet'} />
-          <Tile testId="dash-card-received" icon={RiInboxUnarchiveLine} tone="aqua" label="Received" value={num(data.received)} hint="vehicle reported at destination" />
+          <Tile testId="dash-card-received" icon={RiInboxUnarchiveLine} tone="aqua" label="Received" value={num(data.received)} hint="vehicle reported in this period" />
           <Tile testId="dash-card-overdue" icon={RiAlarmWarningLine} tone="red" label="Overdue" value={num(data.overdue)} hint="past ETA, not reported" />
           <Tile testId="dash-card-inward-odc" icon={RiLoginBoxLine} tone="violet" label="Inward ODC" value={num(data.inwardOdc)} hint="shipments with ODC cabins" />
-          <Tile testId="dash-card-receiving-odc" icon={RiInboxArchiveLine} tone="amber" label="Receiving ODC" value={num(data.receivingOdc)} hint="ODC document at receiving" />
+          <Tile testId="dash-card-receiving-odc" icon={RiInboxArchiveLine} tone="amber" label="Receiving ODC" value={num(data.receivingOdc)} hint="reported in this period, with ODC document" />
           <Tile testId="dash-card-transporter-billing" icon={RiMoneyRupeeCircleLine} tone="slate" label="Transporter Billing" value={inr(data.transporterBilling)}
             hint={`${num(data.billedShipments)} billed shipment${data.billedShipments === 1 ? '' : 's'} (final + draft)`} />
           <Tile testId="dash-card-customer-billing" icon={RiHandCoinLine} tone="green" label="Customer Billing" value={inr(data.customerBilling)}
@@ -104,7 +104,7 @@ function DestinationChart() {
   const { data, loading, error } = useWidgetData<GroupRow[]>('destinations', period);
   const rows = data ?? [];
   return (
-    <Widget testId="dash-destinations" exportName="shipments-by-destination" title="Shipment To" icon={RiMapPinLine} className="lg:col-span-2"
+    <Widget testId="dash-destinations" exportName="shipments-by-destination" title="Shipment To" subtitle={`${periodCaption(period)} · Received by vehicle reported date`} icon={RiMapPinLine} className="lg:col-span-2"
       period={period} onPeriod={setPeriod} loading={loading} error={error} empty={!loading && rows.length === 0}
       table={{ columns: [{ key: 'name', label: 'Destination' }, { key: 'total', label: 'Total', numeric: true },
         { key: 'received', label: 'Received', numeric: true }, { key: 'inTransit', label: 'In Transit', numeric: true }], rows: rows as never }}>
@@ -181,7 +181,7 @@ function TransporterChart() {
   const { data, loading, error } = useWidgetData<GroupRow[]>('transporters', period);
   const rows = data ?? [];
   return (
-    <Widget testId="dash-transporters" exportName="transporter-shipments" title="Transporter Shipments" icon={RiContactsLine} className="lg:col-span-2"
+    <Widget testId="dash-transporters" exportName="transporter-shipments" title="Transporter Shipments" subtitle={`${periodCaption(period)} · Received / Receiving ODC by vehicle reported date`} icon={RiContactsLine} className="lg:col-span-2"
       period={period} onPeriod={setPeriod} loading={loading} error={error} empty={!loading && rows.length === 0}
       table={{ columns: [{ key: 'name', label: 'Transporter' }, { key: 'total', label: 'Total', numeric: true },
         { key: 'received', label: 'Received', numeric: true }, { key: 'receivingOdc', label: 'Receiving ODC', numeric: true },
@@ -371,7 +371,7 @@ function Dashboard() {
           <div className="min-w-0">
             <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
             <p className="text-sm text-gray-500 mt-0.5">
-              Each section has its own period (default: this month, by LR date). In Transit includes overdue shipments; Received means the vehicle has reported at the destination.
+              Each section has its own period (default: this month). Totals and In Transit go by LR date; Received and Receiving ODC by the date the vehicle reported. In Transit includes overdue shipments.
             </p>
             {generatedAt && <p className="text-xs font-semibold text-slate-600 mt-1">CKD Logistics · Dashboard report · generated {generatedAt}</p>}
           </div>
