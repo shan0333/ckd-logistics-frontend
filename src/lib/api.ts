@@ -66,6 +66,14 @@ export const updateBillingDetails = (formData: FormData) =>
   api.put('/billingDetails', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
 
 // ─── Dashboard / Report ──────────────────────────────────────────────────────
+// Revamped dashboard (Logistics-backend DashboardV2Controller). from/to = yyyy-MM-dd on the LR date;
+// omit both for the current month. weekly is fixed to the last 7 days.
+export type DashboardWidget = 'cards' | 'destinations' | 'transporters' | 'invoiceStatus' | 'inwardOdc';
+export const getDashboardWidget = (widget: DashboardWidget, range: { from: string; to: string }) =>
+  api.get(`/dashboard2/${widget}`, { params: range });
+export const getDashboardWeekly = () => api.get('/dashboard2/weekly');
+// Rollout gate — only allow-listed users (dashboard.v2.allowed-users on the backend) see the dashboard.
+export const getDashboardAccess = () => api.get('/dashboard2/access');
 export const getShipmentGraphInfo = (payload: OrginFilter) => api.post('/shipmentGraphInfo', payload);
 // Reports menu (Shipment / ODC / SOF / Asset) — see Logistics-backend ReportsController.
 export const downloadShipmentReport = (filter: ReportFilter, format: 'xlsx' | 'pdf') =>
