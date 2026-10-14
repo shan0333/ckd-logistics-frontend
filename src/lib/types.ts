@@ -52,6 +52,10 @@ export interface Orgin {
   flag?: 'O' | 'D';         // 'O' = Origin (outbound from this location), 'D' = Destination (inbound)
   org_status?: 'O' | 'C' | 'S'; // Open -> Work-in-progress (Save) -> Submitted (locked)
   curr_status?: string;     // computed display status: NEW/TRANSIT/RECEIVED/WORK IN-PROGRESS/OVER DUE
+  // Read-only, computed server-side (ShipmentTimeline): 'Y' when the ETA date (LR date + transit
+  // days) passed without the vehicle reporting, or it reported after the ETA date. Stays 'Y' after
+  // a late arrival, unlike the OVER DUE status.
+  overdue?: 'Y' | 'N';
   // Capital "By" is not a typo — Jackson derives the JSON key from the Java getter
   // (getCreated_By/getUpdated_By) by stripping "get" and lowercasing only the first
   // character, so the wire property really is "created_By"/"updated_By".

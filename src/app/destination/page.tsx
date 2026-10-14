@@ -1,5 +1,6 @@
 'use client';
 
+import OverdueTag from '@/components/ui/OverdueTag';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import {
@@ -231,7 +232,7 @@ export default function DestinationPage() {
     { key: 'transporter_name', label: 'Transporter' },
     { key: 'vehicle_no', label: 'Vehicle No' },
     { key: 'lr_date', label: 'LR Date', render: (row) => formatDateOnly(row.lr_date) },
-    { key: 'curr_status', label: 'Status', render: (row) => statusBadge(row.curr_status) },
+    { key: 'curr_status', label: 'Status', render: (row) => <span className="inline-flex items-center whitespace-nowrap">{statusBadge(row.curr_status)}<OverdueTag row={row} testId={`overdue-tag-${row.id}`} /></span> },
     { key: 'vehicle_reported_on', label: 'Vehicle Reported On', render: (row) => formatDateTime(row.vehicle_reported_on) },
     {
       key: 'actions', label: 'Actions',

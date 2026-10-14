@@ -1,5 +1,6 @@
 'use client';
 
+import OverdueTag from '@/components/ui/OverdueTag';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -144,7 +145,7 @@ export default function OrginPage() {
       key: 'ata', label: 'ATA',
       render: (row) => row.vehicle_reported_on ? formatDateTime(row.vehicle_reported_on) : '—',
     },
-    { key: 'curr_status', label: 'Status', render: (row) => statusBadge(row.curr_status) },
+    { key: 'curr_status', label: 'Status', render: (row) => <span className="inline-flex items-center whitespace-nowrap">{statusBadge(row.curr_status)}<OverdueTag row={row} testId={`overdue-tag-${row.id}`} /></span> },
     { key: 'created_By', label: 'Created By' },
     {
       key: 'actions', label: 'Actions',

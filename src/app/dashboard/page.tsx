@@ -20,7 +20,7 @@ import Widget, { AXIS, GRID, LEGEND, PdfButton, SERIES, STATUS, TOOLTIP, todaySt
 
 // ── response shapes (Logistics-backend DashboardV2Service) ──────────────────────────────────
 interface Cards {
-  total: number; inTransit: number; overdue: number; received: number; inwardOdc: number; receivingOdc: number;
+  total: number; inTransit: number; overdue: number; received: number; receivedLate: number; inwardOdc: number; receivingOdc: number;
   transporterBilling: number; customerBilling: number; revenue: number; billedShipments: number;
 }
 interface GroupRow { name: string; total: number; inTransit: number; received: number; receivingOdc?: number }
@@ -82,8 +82,9 @@ function SummaryCards({ sectionRef }: { sectionRef: (el: HTMLElement | null) => 
           <Tile testId="dash-card-total" icon={RiTruckLine} label="Total Shipments" value={num(data.total)} />
           <Tile testId="dash-card-intransit" icon={RiRouteLine} tone="orange" label="In Transit" value={num(data.inTransit)}
             hint={data.overdue ? `incl. ${num(data.overdue)} overdue` : 'vehicle not reported yet'} />
-          <Tile testId="dash-card-received" icon={RiInboxUnarchiveLine} tone="aqua" label="Received" value={num(data.received)} hint="vehicle reported in this period" />
-          <Tile testId="dash-card-overdue" icon={RiAlarmWarningLine} tone="red" label="Overdue" value={num(data.overdue)} hint="past ETA, not reported" />
+          <Tile testId="dash-card-received" icon={RiInboxUnarchiveLine} tone="aqua" label="Received" value={num(data.received)}
+            hint={data.receivedLate ? `in this period · ${num(data.receivedLate)} after ETA (overdue)` : 'vehicle reported in this period'} />
+          <Tile testId="dash-card-overdue" icon={RiAlarmWarningLine} tone="red" label="Overdue" value={num(data.overdue)} hint="ETA date passed, vehicle not reported" />
           <Tile testId="dash-card-inward-odc" icon={RiLoginBoxLine} tone="violet" label="Inward ODC" value={num(data.inwardOdc)} hint="shipments with ODC cabins" />
           <Tile testId="dash-card-receiving-odc" icon={RiInboxArchiveLine} tone="amber" label="Receiving ODC" value={num(data.receivingOdc)} hint="reported in this period, with ODC document" />
           <Tile testId="dash-card-transporter-billing" icon={RiMoneyRupeeCircleLine} tone="slate" label="Transporter Billing" value={inr(data.transporterBilling)}

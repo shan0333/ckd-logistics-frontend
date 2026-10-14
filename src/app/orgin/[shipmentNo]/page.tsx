@@ -1,5 +1,6 @@
 'use client';
 
+import OverdueTag from '@/components/ui/OverdueTag';
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
@@ -142,6 +143,7 @@ export default function ShipmentViewPage() {
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-bold text-gray-900">{shipmentNo}</h1>
             {row && <StatusBadge status={row.curr_status} />}
+            {row && <OverdueTag row={row} testId="orgin-view-overdue-tag" />}
           </div>
         </div>
         {row?.curr_status === 'TRANSIT' && (
