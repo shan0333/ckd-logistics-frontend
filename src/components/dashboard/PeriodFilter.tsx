@@ -3,17 +3,20 @@
 import { useState } from 'react';
 import { RiCalendarLine } from 'react-icons/ri';
 
-export type PeriodKey = 'thisWeek' | 'lastWeek' | 'thisMonth' | 'lastMonth' | 'custom';
+export type PeriodKey = 'today' | 'yesterday' | 'thisWeek' | 'lastWeek' | 'thisMonth' | 'lastMonth' | 'financialYear' | 'custom';
 export interface Period { key: PeriodKey; from: string; to: string }
 
 const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
-/** Weeks run Monday–Sunday; months are calendar months. */
+/** Weeks run Monday–Sunday; months are calendar months; the financial year is India's, 1 April – 31 March. */
 export function presetRange(key: Exclude<PeriodKey, 'custom'>): Period {
   const now = new Date();
   const y = now.getFullYear(), m = now.getMonth(), d = now.getDate();
   const monday = new Date(y, m, d - ((now.getDay() + 6) % 7));
   switch (key) {
+    case 'today': return { key, from: iso(now), to: iso(now) };
+    case 'yesterday': { const yd = new Date(y, m, d - 1); return { key, from: iso(yd), to: iso(yd) }; }
+    case 'financialYear': { const fy = m >= 3 ? y : y - 1; return { key, from: iso(new Date(fy, 3, 1)), to: iso(new Date(fy + 1, 2, 31)) }; }
     case 'thisWeek': return { key, from: iso(monday), to: iso(new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + 6)) };
     case 'lastWeek': return { key, from: iso(new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() - 7)), to: iso(new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() - 1)) };
     case 'lastMonth': return { key, from: iso(new Date(y, m - 1, 1)), to: iso(new Date(y, m, 0)) };
@@ -24,10 +27,13 @@ export function presetRange(key: Exclude<PeriodKey, 'custom'>): Period {
 export const DEFAULT_PERIOD = () => presetRange('thisMonth');
 
 const OPTIONS: { value: PeriodKey; label: string }[] = [
+  { value: 'today', label: 'Today' },
+  { value: 'yesterday', label: 'Yesterday' },
   { value: 'thisWeek', label: 'This Week' },
   { value: 'lastWeek', label: 'Last Week' },
   { value: 'thisMonth', label: 'This Month' },
   { value: 'lastMonth', label: 'Last Month' },
+  { value: 'financialYear', label: 'Financial Year' },
   { value: 'custom', label: 'Custom' },
 ];
 

@@ -10,7 +10,7 @@ import {
 import {
   RiTruckLine, RiRouteLine, RiInboxUnarchiveLine, RiAlarmWarningLine, RiLoginBoxLine, RiInboxArchiveLine,
   RiMoneyRupeeCircleLine, RiHandCoinLine, RiMapPinLine, RiBillLine, RiContactsLine, RiBox3Line,
-  RiCalendarCheckLine, RiFileAddLine, RiBarcodeBoxLine, RiLoader4Line, RiDashboardLine, RiFilePdf2Line, RiToolsLine,
+  RiCalendarCheckLine, RiFileAddLine, RiBarcodeBoxLine, RiLoader4Line, RiDashboardLine, RiFilePdf2Line, RiToolsLine, RiLineChartLine,
 } from 'react-icons/ri';
 import { downloadDashboardAsPdf } from '@/lib/pdfExport';
 import { getUsername } from '@/lib/auth';
@@ -21,12 +21,12 @@ import Widget, { AXIS, GRID, LEGEND, PdfButton, SERIES, STATUS, TOOLTIP, todaySt
 // ── response shapes (Logistics-backend DashboardV2Service) ──────────────────────────────────
 interface Cards {
   total: number; inTransit: number; overdue: number; received: number; inwardOdc: number; receivingOdc: number;
-  transporterBilling: number; customerBilling: number; billedShipments: number;
+  transporterBilling: number; customerBilling: number; revenue: number; billedShipments: number;
 }
 interface GroupRow { name: string; total: number; inTransit: number; received: number; receivingOdc?: number }
 interface InvoiceStatus { billable: number; completed: number; draft: number; notBilled: number }
 interface InwardOdc { shipments: number; odcCabins: number; totalShipments: number; byDestination: { name: string; shipments: number }[] }
-interface WeeklyDay { date: string; created: number; received: number; assetsMapped: number }
+interface WeeklyDay { date: string; created: number; received: number; receivingOdc: number; assetsMapped: number }
 
 const inr = (n: number) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n || 0);
 const num = (n: number) => new Intl.NumberFormat('en-IN').format(n || 0);
@@ -78,7 +78,7 @@ function SummaryCards({ sectionRef }: { sectionRef: (el: HTMLElement | null) => 
       ) : error || !data ? (
         <div className="min-h-[120px] flex items-center justify-center text-red-600 text-sm">{error ?? 'Could not load the summary.'}</div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
           <Tile testId="dash-card-total" icon={RiTruckLine} label="Total Shipments" value={num(data.total)} />
           <Tile testId="dash-card-intransit" icon={RiRouteLine} tone="orange" label="In Transit" value={num(data.inTransit)}
             hint={data.overdue ? `incl. ${num(data.overdue)} overdue` : 'vehicle not reported yet'} />
@@ -90,6 +90,8 @@ function SummaryCards({ sectionRef }: { sectionRef: (el: HTMLElement | null) => 
             hint={`${num(data.billedShipments)} billed shipment${data.billedShipments === 1 ? '' : 's'} (final + draft)`} />
           <Tile testId="dash-card-customer-billing" icon={RiHandCoinLine} tone="green" label="Customer Billing" value={inr(data.customerBilling)}
             hint={`${num(data.billedShipments)} billed shipment${data.billedShipments === 1 ? '' : 's'} (final + draft)`} />
+          <Tile testId="dash-card-revenue" icon={RiLineChartLine} tone={data.revenue < 0 ? 'red' : 'blue'} label="Revenue" value={inr(data.revenue)}
+            hint="customer billing − transporter billing" />
         </div>
       )}
     </section>
@@ -102,10 +104,10 @@ function DestinationChart() {
   const { data, loading, error } = useWidgetData<GroupRow[]>('destinations', period);
   const rows = data ?? [];
   return (
-    <Widget testId="dash-destinations" exportName="shipments-by-destination" title="Shipments To — by Destination" icon={RiMapPinLine} className="lg:col-span-2"
+    <Widget testId="dash-destinations" exportName="shipments-by-destination" title="Shipment To" icon={RiMapPinLine} className="lg:col-span-2"
       period={period} onPeriod={setPeriod} loading={loading} error={error} empty={!loading && rows.length === 0}
       table={{ columns: [{ key: 'name', label: 'Destination' }, { key: 'total', label: 'Total', numeric: true },
-        { key: 'inTransit', label: 'In Transit', numeric: true }, { key: 'received', label: 'Received', numeric: true }], rows: rows as never }}>
+        { key: 'received', label: 'Received', numeric: true }, { key: 'inTransit', label: 'In Transit', numeric: true }], rows: rows as never }}>
       <ResponsiveContainer width="100%" height={300}>
         <BarChart data={rows} barGap={2} barCategoryGap="22%" margin={{ top: 20, right: 8, left: -12, bottom: 0 }}>
           <CartesianGrid {...GRID} />
@@ -116,11 +118,11 @@ function DestinationChart() {
           <Bar dataKey="total" name="Total" fill={SERIES.total} radius={BAR_RADIUS} maxBarSize={28}>
             <LabelList dataKey="total" position="top" style={VALUE_LABEL} formatter={hideZero} />
           </Bar>
-          <Bar dataKey="inTransit" name="In Transit" fill={SERIES.inTransit} radius={BAR_RADIUS} maxBarSize={28}>
-            <LabelList dataKey="inTransit" position="top" style={VALUE_LABEL} formatter={hideZero} />
-          </Bar>
           <Bar dataKey="received" name="Received" fill={SERIES.received} radius={BAR_RADIUS} maxBarSize={28}>
             <LabelList dataKey="received" position="top" style={VALUE_LABEL} formatter={hideZero} />
+          </Bar>
+          <Bar dataKey="inTransit" name="In Transit" fill={SERIES.inTransit} radius={BAR_RADIUS} maxBarSize={28}>
+            <LabelList dataKey="inTransit" position="top" style={VALUE_LABEL} formatter={hideZero} />
           </Bar>
         </BarChart>
       </ResponsiveContainer>
@@ -182,8 +184,8 @@ function TransporterChart() {
     <Widget testId="dash-transporters" exportName="transporter-shipments" title="Transporter Shipments" icon={RiContactsLine} className="lg:col-span-2"
       period={period} onPeriod={setPeriod} loading={loading} error={error} empty={!loading && rows.length === 0}
       table={{ columns: [{ key: 'name', label: 'Transporter' }, { key: 'total', label: 'Total', numeric: true },
-        { key: 'received', label: 'Received', numeric: true }, { key: 'inTransit', label: 'In Transit', numeric: true },
-        { key: 'receivingOdc', label: 'Receiving ODC', numeric: true }], rows: rows as never }}>
+        { key: 'received', label: 'Received', numeric: true }, { key: 'receivingOdc', label: 'Receiving ODC', numeric: true },
+        { key: 'inTransit', label: 'In Transit', numeric: true }], rows: rows as never }}>
       <ResponsiveContainer width="100%" height={Math.max(260, rows.length * 64 + 60)}>
         <BarChart data={rows} layout="vertical" barGap={2} barCategoryGap="18%" margin={{ top: 4, right: 32, left: 8, bottom: 0 }}>
           <CartesianGrid {...GRID} vertical horizontal={false} />
@@ -197,11 +199,11 @@ function TransporterChart() {
           <Bar dataKey="received" name="Received" fill={SERIES.received} radius={HBAR_RADIUS} maxBarSize={12}>
             <LabelList dataKey="received" position="right" style={VALUE_LABEL} formatter={hideZero} />
           </Bar>
-          <Bar dataKey="inTransit" name="In Transit" fill={SERIES.inTransit} radius={HBAR_RADIUS} maxBarSize={12}>
-            <LabelList dataKey="inTransit" position="right" style={VALUE_LABEL} formatter={hideZero} />
-          </Bar>
           <Bar dataKey="receivingOdc" name="Receiving ODC" fill={SERIES.receivingOdc} radius={HBAR_RADIUS} maxBarSize={12}>
             <LabelList dataKey="receivingOdc" position="right" style={VALUE_LABEL} formatter={hideZero} />
+          </Bar>
+          <Bar dataKey="inTransit" name="In Transit" fill={SERIES.inTransit} radius={HBAR_RADIUS} maxBarSize={12}>
+            <LabelList dataKey="inTransit" position="right" style={VALUE_LABEL} formatter={hideZero} />
           </Bar>
         </BarChart>
       </ResponsiveContainer>
@@ -270,10 +272,11 @@ function WeeklyCharts() {
   const charts: { key: keyof WeeklyDay; title: string; icon: IconType; testId: string }[] = [
     { key: 'created', title: 'Shipments Created', icon: RiFileAddLine, testId: 'dash-weekly-created' },
     { key: 'received', title: 'Shipments Received', icon: RiCalendarCheckLine, testId: 'dash-weekly-received' },
+    { key: 'receivingOdc', title: 'Receiving ODC', icon: RiInboxArchiveLine, testId: 'dash-weekly-receiving-odc' },
     { key: 'assetsMapped', title: 'Assets Mapped', icon: RiBarcodeBoxLine, testId: 'dash-weekly-assets' },
   ];
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
       {charts.map((c) => {
         const total = (days ?? []).reduce((a, d) => a + Number(d[c.key] ?? 0), 0);
         return (
