@@ -1,5 +1,6 @@
-// Same helper as ckd-next-frontend/src/lib/pdfExport.ts (the /ckd dashboard's PDF export), so both
-// apps' dashboard PDFs look and behave the same. Keep the two copies in step.
+// Started as a copy of ckd-next-frontend/src/lib/pdfExport.ts (the /ckd dashboard's PDF export).
+// Differs in downloadDashboardAsPdf: this one never slices a chart across a page break (too-tall
+// rows are split into their widgets, too-tall widgets are scaled to one page) instead of tiling.
 
 import { toPng, toJpeg } from 'html-to-image';
 import jsPDF from 'jspdf';
@@ -77,34 +78,41 @@ const SECTION_GAP_MM = 4;
 const CONTENT_WIDTH_MM = PAGE_WIDTH_MM - MARGIN_MM * 2;
 const CONTENT_HEIGHT_MM = PAGE_HEIGHT_MM - MARGIN_MM * 2;
 
-/** Tiles one (already-captured) image down the page from `startY`, adding new pages as needed —
- *  the fallback for a single section taller than one whole page (realistically only the full
- *  Lot Progress table with a lot of rows). Same "repeat the full image at a shifted negative
- *  offset per page" trick as before, just scoped to one section instead of the whole capture. */
-function tileImageAcrossPages(pdf: jsPDF, dataUrl: string, widthMm: number, heightMm: number, startY: number) {
-  let heightLeft = heightMm - (CONTENT_HEIGHT_MM - startY + MARGIN_MM);
-  pdf.addImage(dataUrl, 'JPEG', MARGIN_MM, startY, widthMm, heightMm);
-  let position = startY;
-  while (heightLeft > 0) {
-    position = MARGIN_MM - (heightMm - heightLeft);
-    pdf.addPage();
-    pdf.addImage(dataUrl, 'JPEG', MARGIN_MM, position, widthMm, heightMm);
-    heightLeft -= CONTENT_HEIGHT_MM;
-  }
-}
-
-/** Downloads an ordered list of sections as a multi-page A4 PDF — each section (a chart card,
- *  the stat tiles, a table, ...) is captured and placed as its own image, and a section only
- *  ever starts a fresh page rather than being sliced mid-chart across a page boundary (unlike
- *  naively tiling one giant screenshot, which cuts through whatever happens to sit on a page
- *  edge). A section taller than a full page on its own (realistically only a long table) falls
- *  back to tileImageAcrossPages for just that one section. Used for the "export full dashboard"
- *  button — captures exactly what's currently toggled into each section (including whichever
- *  drill-down panel happens to be open), same as the on-screen page. */
+/** Downloads an ordered list of sections as a multi-page A4 PDF where **nothing is ever cut
+ *  across a page break**: each section (header, stat tiles, a row of charts, ...) is captured as
+ *  its own image and placed whole — on the current page if it fits, otherwise on a fresh one.
+ *
+ *  A section taller than a whole page (e.g. a two-chart row that stacked into one column in a
+ *  narrow window, or zoomed in) is broken into its widgets — every `<section>` inside it — and
+ *  each widget is placed whole, at the same share of the page width it had on screen. A single
+ *  widget that is *still* taller than a page is scaled down to fit one page. Used for the
+ *  "Export Full Dashboard PDF" button; it captures exactly what's on screen in each section. */
 export async function downloadDashboardAsPdf(sections: (HTMLElement | null)[], filename: string): Promise<void> {
   const pdf = new jsPDF('p', 'mm', 'a4');
   let y = MARGIN_MM;
   let pageHasContent = false;
+
+  const newPage = () => { pdf.addPage(); y = MARGIN_MM; pageHasContent = false; };
+
+  /** Places one captured image whole. `widthMm` is its natural width on the page. */
+  const place = (dataUrl: string, widthMm: number, heightMm: number) => {
+    let w = widthMm, h = heightMm;
+    if (h > CONTENT_HEIGHT_MM) {            // taller than a page on its own: shrink to fit one page
+      w = (w * CONTENT_HEIGHT_MM) / h;
+      h = CONTENT_HEIGHT_MM;
+    }
+    if (pageHasContent && y + h > PAGE_HEIGHT_MM - MARGIN_MM) newPage();
+    const x = MARGIN_MM + (CONTENT_WIDTH_MM - w) / 2;   // centred when narrower than the page
+    pdf.addImage(dataUrl, 'JPEG', x, y, w, h);
+    y += h + SECTION_GAP_MM;
+    pageHasContent = true;
+  };
+
+  /** The widgets inside a section: its outermost <section> descendants. */
+  const partsOf = (el: HTMLElement): HTMLElement[] => {
+    const all = Array.from(el.querySelectorAll<HTMLElement>('section'));
+    return all.filter((s) => !all.some((o) => o !== s && o.contains(s)));
+  };
 
   for (const el of sections) {
     if (!el) continue;
@@ -112,31 +120,19 @@ export async function downloadDashboardAsPdf(sections: (HTMLElement | null)[], f
     const img = await loadImage(dataUrl);
     const heightMm = (img.naturalHeight * CONTENT_WIDTH_MM) / img.naturalWidth;
 
-    if (heightMm > CONTENT_HEIGHT_MM) {
-      if (pageHasContent) { pdf.addPage(); y = MARGIN_MM; }
-      tileImageAcrossPages(pdf, dataUrl, CONTENT_WIDTH_MM, heightMm, y);
-      pdf.addPage();
-      y = MARGIN_MM;
-      pageHasContent = false;
+    const parts = heightMm > CONTENT_HEIGHT_MM ? partsOf(el) : [];
+    if (parts.length > 1) {
+      // Too tall as one block — place its widgets one by one, each keeping its on-screen width share.
+      const sectionWidthPx = el.getBoundingClientRect().width || 1;
+      for (const part of parts) {
+        const partUrl = await captureElementJpeg(part);
+        const partImg = await loadImage(partUrl);
+        const widthMm = Math.min(CONTENT_WIDTH_MM, (CONTENT_WIDTH_MM * part.getBoundingClientRect().width) / sectionWidthPx);
+        place(partUrl, widthMm, (partImg.naturalHeight * widthMm) / partImg.naturalWidth);
+      }
       continue;
     }
-
-    if (pageHasContent && y + heightMm > PAGE_HEIGHT_MM - MARGIN_MM) {
-      pdf.addPage();
-      y = MARGIN_MM;
-      pageHasContent = false;
-    }
-
-    pdf.addImage(dataUrl, 'JPEG', MARGIN_MM, y, CONTENT_WIDTH_MM, heightMm);
-    y += heightMm + SECTION_GAP_MM;
-    pageHasContent = true;
-  }
-
-  // The tiled-section branch always opens a trailing page for whatever comes next, even when
-  // that tiled section was the last one overall — drop it rather than shipping a blank final page.
-  const pageCount = pdf.getNumberOfPages();
-  if (pageCount > 1 && !pageHasContent) {
-    pdf.deletePage(pageCount);
+    place(dataUrl, CONTENT_WIDTH_MM, heightMm);
   }
 
   pdf.save(filename);
