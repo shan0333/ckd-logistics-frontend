@@ -5,7 +5,7 @@ import toast from 'react-hot-toast';
 import clsx from 'clsx';
 import { RiAddLine, RiDeleteBinLine, RiEditLine, RiGroupLine, RiSearchLine, RiUserSettingsLine } from 'react-icons/ri';
 import {
-  getAccessGroups, createAccessGroup, updateAccessGroup, deleteAccessGroup, getAccessUsers, assignAccessGroup,
+  getAccessGroups, createAccessGroup, updateAccessGroup, deleteAccessGroup, getAccessUsers, assignAccessGroup, setAppAccess,
 } from '@/lib/api';
 import { ACCESS_MODULES, type AccessLevel, type AccessModule } from '@/lib/access';
 import Modal from '@/components/ui/Modal';
@@ -15,7 +15,7 @@ import Spinner from '@/components/ui/Spinner';
 interface Group { id: number; name: string; members: number; access: Partial<Record<AccessModule, AccessLevel>> }
 interface AccessUser {
   id: number; username: string | null; email: string; roles: string | null; adminRole: boolean;
-  groupId: number | null; groupName: string | null;
+  groupId: number | null; groupName: string | null; appAllowed: boolean;
 }
 type Choice = AccessLevel | 'NONE';
 
@@ -39,6 +39,7 @@ export default function UserAccessPage() {
   const [search, setSearch] = useState('');
   const [groupFilter, setGroupFilter] = useState<string>('');
   const [savingUser, setSavingUser] = useState<number | null>(null);
+  const [confirmBlock, setConfirmBlock] = useState<AccessUser | null>(null);
 
   const [editing, setEditing] = useState<{ id: number | null; name: string; access: Record<AccessModule, Choice> } | null>(null);
   const [savingGroup, setSavingGroup] = useState(false);
@@ -77,6 +78,19 @@ export default function UserAccessPage() {
         members: x.members + (x.id === groupId ? 1 : 0) - (x.id === u.groupId ? 1 : 0),
       })));
       toast.success(`${u.email} → ${g?.name ?? 'No group (default access)'}`);
+    } catch (e) {
+      toast.error(errMsg(e, 'Could not save.'));
+    } finally {
+      setSavingUser(null);
+    }
+  };
+
+  const saveAppAccess = async (u: AccessUser, allowed: boolean) => {
+    setSavingUser(u.id);
+    try {
+      await setAppAccess(u.id, allowed);
+      setUsers((prev) => prev.map((x) => (x.id === u.id ? { ...x, appAllowed: allowed } : x)));
+      toast.success(`${u.email}: Logistics ${allowed ? 'allowed' : 'blocked'}`);
     } catch (e) {
       toast.error(errMsg(e, 'Could not save.'));
     } finally {
@@ -128,6 +142,15 @@ export default function UserAccessPage() {
   return (
     <div>
       <ConfirmDialog
+        testId="access-block-confirm"
+        open={!!confirmBlock}
+        title="Block from Logistics"
+        message={`Block ${confirmBlock?.email} from the Logistics app? They won't be able to sign in to it.`}
+        confirmLabel="Block"
+        onConfirm={() => { const u = confirmBlock; setConfirmBlock(null); if (u) saveAppAccess(u, false); }}
+        onCancel={() => setConfirmBlock(null)}
+      />
+      <ConfirmDialog
         testId="access-group-delete-confirm"
         open={!!confirmDelete}
         title="Delete Group"
@@ -176,6 +199,7 @@ export default function UserAccessPage() {
                 <tr>
                   <th className="text-left px-4 py-3">User</th>
                   <th className="text-left px-4 py-3">Role</th>
+                  <th className="text-left px-4 py-3 w-40">App access</th>
                   <th className="text-left px-4 py-3 w-64">Group</th>
                 </tr>
               </thead>
@@ -188,6 +212,20 @@ export default function UserAccessPage() {
                     </td>
                     <td className="px-4 py-2.5 text-slate-600">{u.roles || '—'}</td>
                     <td className="px-4 py-2.5">
+                      {u.adminRole ? (
+                        <span className="text-xs font-semibold text-emerald-700">Allowed</span>
+                      ) : (
+                        <button data-testid={`access-user-app-${u.id}`} disabled={savingUser === u.id}
+                          onClick={() => (u.appAllowed ? setConfirmBlock(u) : saveAppAccess(u, true))}
+                          title={u.appAllowed ? 'Click to block this user from Logistics' : 'Click to allow this user into Logistics'}
+                          className={clsx('px-2.5 py-1 rounded-full text-xs font-semibold border disabled:opacity-60',
+                            u.appAllowed ? 'bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100'
+                              : 'bg-red-50 border-red-200 text-red-700 hover:bg-red-100')}>
+                          {u.appAllowed ? 'Allowed' : 'Blocked'}
+                        </button>
+                      )}
+                    </td>
+                    <td className="px-4 py-2.5">
                       <select data-testid={`access-user-group-${u.id}`} value={u.groupId == null ? '' : String(u.groupId)}
                         disabled={savingUser === u.id} onChange={(e) => assign(u, e.target.value)}
                         className="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-sm bg-white disabled:opacity-60">
@@ -199,13 +237,13 @@ export default function UserAccessPage() {
                   </tr>
                 ))}
                 {filteredUsers.length === 0 && (
-                  <tr><td colSpan={3} className="px-4 py-8 text-center text-slate-400">No users found.</td></tr>
+                  <tr><td colSpan={4} className="px-4 py-8 text-center text-slate-400">No users found.</td></tr>
                 )}
               </tbody>
             </table>
           </div>
           <p className="px-4 py-3 text-xs text-slate-500 border-t border-slate-100">
-            No group = view only on Shipments, Receiving and Shipment Report. Changes apply on the user&apos;s next page load.
+            No group = view only on Shipments, Receiving and Shipment Report. Blocked = can&apos;t sign in to Logistics. Changes apply on the user&apos;s next page load.
           </p>
         </div>
       ) : (

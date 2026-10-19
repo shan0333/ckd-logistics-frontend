@@ -104,5 +104,7 @@ export const deleteAccessGroup = (id: number) => api.delete(`/logisticsAccess/gr
 export const getAccessUsers = () => api.get('/logisticsAccess/users');
 export const assignAccessGroup = (userId: number, groupId: number | null) =>
   api.put(`/logisticsAccess/users/${userId}`, { groupId });
+export const setAppAccess = (userId: number, allowed: boolean) =>
+  api.put(`/logisticsAccess/users/${userId}/app`, { allowed });
 
 export default api;

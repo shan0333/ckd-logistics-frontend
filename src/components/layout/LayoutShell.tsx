@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import Sidebar from './Sidebar';
 import Header from './Header';
-import { isLoggedIn } from '@/lib/auth';
+import { clearSession, isLoggedIn } from '@/lib/auth';
 import { AccessProvider, pageAllowed, useAccess } from '@/lib/access';
 import NoAccess from '@/components/ui/NoAccess';
 import Spinner from '@/components/ui/Spinner';
@@ -53,6 +53,19 @@ export default function LayoutShell({ children }: { children: React.ReactNode })
 function PageGate({ pathname, children }: { pathname: string; children: React.ReactNode }) {
   const state = useAccess();
   if (!state.loaded) return <Spinner />;
+  if (!state.appAllowed) {
+    return (
+      <div data-testid="app-blocked" className="bg-white rounded-xl shadow-sm border border-slate-200 p-10 text-center">
+        <p className="text-sm font-semibold text-slate-700">You don&apos;t have access to the Logistics application.</p>
+        <p className="text-xs text-slate-500 mt-1">Please contact your admin if you need it.</p>
+        <button
+          onClick={() => { clearSession(); document.cookie = 'logistics_token=; Max-Age=0; path=/'; window.location.href = `${process.env.NEXT_PUBLIC_BASE_PATH || ''}/login`; }}
+          className="mt-4 px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700">
+          Back to login
+        </button>
+      </div>
+    );
+  }
   if (!pageAllowed(pathname, state)) return <NoAccess />;
   return <>{children}</>;
 }

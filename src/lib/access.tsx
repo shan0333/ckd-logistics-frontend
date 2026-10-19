@@ -23,6 +23,7 @@ export const ACCESS_MODULES: { key: AccessModule; label: string; report?: boolea
 
 export interface MyAccess {
   admin: boolean;
+  appAllowed: boolean;
   group: string | null;
   modules: Partial<Record<AccessModule, AccessLevel>>;
 }
@@ -33,6 +34,7 @@ interface AccessState {
   canView: (m: AccessModule) => boolean;
   canEdit: (m: AccessModule) => boolean;
   isAccessAdmin: boolean;
+  appAllowed: boolean;
 }
 
 const CACHE_KEY = 'logisticsAccess';
@@ -52,8 +54,20 @@ export function clearAccessCache() {
 }
 
 const AccessContext = createContext<AccessState>({
-  loaded: false, access: null, canView: () => false, canEdit: () => false, isAccessAdmin: false,
+  loaded: false, access: null, canView: () => false, canEdit: () => false, isAccessAdmin: false, appAllowed: true,
 });
+
+/** Fetches the current user's access (the token must already be in the session). */
+export async function fetchMyAccess(): Promise<MyAccess | null> {
+  const res = await getMyAccess();
+  const a = res.data?.data?.[0] as MyAccess | undefined;
+  if (!a) return null;
+  return { admin: !!a.admin, appAllowed: a.appAllowed !== false, group: a.group ?? null, modules: a.modules ?? {} };
+}
+
+export function writeAccessCache(a: MyAccess) {
+  try { sessionStorage.setItem(CACHE_KEY, JSON.stringify(a)); } catch { /* ignore */ }
+}
 
 // Loaded once per page load (and refreshed then), so an admin's change applies on the user's next
 // page load. The sessionStorage copy only avoids a blank menu while the fresh copy is fetched.
@@ -66,13 +80,11 @@ export function AccessProvider({ enabled, children }: { enabled: boolean; childr
     const cached = readCache();
     if (cached) { setAccess(cached); setLoaded(true); }
     let cancelled = false;
-    getMyAccess()
-      .then((res) => {
-        const a = res.data?.data?.[0] as MyAccess | undefined;
-        if (cancelled || !a) return;
-        const fresh: MyAccess = { admin: !!a.admin, group: a.group ?? null, modules: a.modules ?? {} };
+    fetchMyAccess()
+      .then((fresh) => {
+        if (cancelled || !fresh) return;
         setAccess(fresh);
-        try { sessionStorage.setItem(CACHE_KEY, JSON.stringify(fresh)); } catch { /* ignore */ }
+        writeAccessCache(fresh);
       })
       .catch(() => { /* keep the cached copy; with none, everything stays hidden */ })
       .finally(() => { if (!cancelled) setLoaded(true); });
@@ -83,7 +95,7 @@ export function AccessProvider({ enabled, children }: { enabled: boolean; childr
   const canEdit = useCallback((m: AccessModule) => access?.modules?.[m] === 'FULL', [access]);
 
   return (
-    <AccessContext.Provider value={{ loaded, access, canView, canEdit, isAccessAdmin: !!access?.admin }}>
+    <AccessContext.Provider value={{ loaded, access, canView, canEdit, isAccessAdmin: !!access?.admin, appAllowed: access?.appAllowed !== false }}>
       {children}
     </AccessContext.Provider>
   );
