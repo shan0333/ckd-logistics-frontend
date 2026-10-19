@@ -17,6 +17,7 @@ import ShipmentImageGrid from '@/components/ui/ShipmentImageGrid';
 import { tagDocs } from '@/lib/shipmentDocs';
 import { RiAddLine, RiEditLine, RiEyeLine } from 'react-icons/ri';
 import { isAdmin } from '@/lib/auth';
+import { useAccess } from '@/lib/access';
 
 const EMPTY: BillingDetails = {
   orginId: undefined, grnNumber: '', podStatus: '', invoiceNumber: '', invoiceDate: '',
@@ -67,6 +68,7 @@ export default function BillingDetailsPage() {
   const [loadingBillingDocs, setLoadingBillingDocs] = useState(false);
 
   const admin = isAdmin();
+  const canEdit = useAccess().canEdit('BILLING');
 
   const load = useCallback(async (q: string) => {
     setLoading(true);
@@ -220,7 +222,7 @@ export default function BillingDetailsPage() {
           {
             label: isLocked(row) ? (admin ? 'Enable Edit' : 'Locked') : 'Edit',
             icon: RiEditLine,
-            hidden: isLocked(row) && !admin,
+            hidden: !canEdit || (isLocked(row) && !admin),
             onClick: () => openEdit(row, false),
             testId: `billing-row-edit-${row.id}`,
           },
@@ -250,10 +252,12 @@ export default function BillingDetailsPage() {
           <h1 className="text-2xl font-bold text-gray-900">Billing Details</h1>
           <p className="text-sm text-gray-500 mt-0.5">{all.length} record(s)</p>
         </div>
-        <button data-testid="billing-add-button" onClick={openAdd}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700">
-          <RiAddLine className="w-4 h-4" /> New Billing Details
-        </button>
+        {canEdit && (
+          <button data-testid="billing-add-button" onClick={openAdd}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700">
+            <RiAddLine className="w-4 h-4" /> New Billing Details
+          </button>
+        )}
       </div>
 
       <div className="relative mb-5 max-w-md">

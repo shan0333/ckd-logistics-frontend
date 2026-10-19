@@ -7,6 +7,7 @@ export function saveSession(data: {
   locId?: number | null;
 }) {
   sessionStorage.setItem('username', data.username);
+  sessionStorage.removeItem('logisticsAccess'); // the previous user's cached menu access
   sessionStorage.setItem('token', 'Bearer ' + data.token);
   sessionStorage.setItem('id', String(data.id));
   if (data.roles) sessionStorage.setItem('roles', JSON.stringify(data.roles));
@@ -28,6 +29,7 @@ export function clearSession() {
   sessionStorage.removeItem('roles');
   sessionStorage.removeItem('refreshToken');
   sessionStorage.removeItem('locId');
+  sessionStorage.removeItem('logisticsAccess');
 }
 
 export function isLoggedIn(): boolean {

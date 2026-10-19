@@ -13,6 +13,7 @@ import ActionMenu from '@/components/ui/ActionMenu';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { RiAddLine, RiDeleteBinLine, RiEditLine } from 'react-icons/ri';
 import { isAdmin } from '@/lib/auth';
+import { useAccess } from '@/lib/access';
 
 const EMPTY: Transporter = { name: '', email: '', mobile: '', contactPerson: '' };
 
@@ -39,6 +40,7 @@ export default function TransporterMasterPage() {
   const [renameConfirm, setRenameConfirm] = useState<{ form: Transporter; affected: number } | null>(null);
 
   const admin = isAdmin();
+  const canEdit = useAccess().canEdit('TRANSPORTER');
 
   const load = useCallback(async (q: string) => {
     setLoading(true);
@@ -144,8 +146,8 @@ export default function TransporterMasterPage() {
       key: 'actions', label: 'Actions',
       render: (row) => (
         <ActionMenu triggerTestId={`transporter-row-actions-${row.id}`} items={[
-          { label: 'Edit', icon: RiEditLine, onClick: () => openEdit(row), testId: `transporter-row-edit-${row.id}` },
-          { label: 'Delete', icon: RiDeleteBinLine, danger: true, hidden: !admin, onClick: () => setConfirmRow(row), testId: `transporter-row-delete-${row.id}` },
+          { label: 'Edit', icon: RiEditLine, hidden: !canEdit, onClick: () => openEdit(row), testId: `transporter-row-edit-${row.id}` },
+          { label: 'Delete', icon: RiDeleteBinLine, danger: true, hidden: !admin || !canEdit, onClick: () => setConfirmRow(row), testId: `transporter-row-delete-${row.id}` },
         ]} />
       ),
     },
@@ -184,10 +186,12 @@ export default function TransporterMasterPage() {
           <h1 className="text-2xl font-bold text-gray-900">Transporters</h1>
           <p className="text-sm text-gray-500 mt-0.5">{all.length} transporter(s)</p>
         </div>
-        <button data-testid="transporter-add-button" onClick={openAdd}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700">
-          <RiAddLine className="w-4 h-4" /> New Transporter
-        </button>
+        {canEdit && (
+          <button data-testid="transporter-add-button" onClick={openAdd}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700">
+            <RiAddLine className="w-4 h-4" /> New Transporter
+          </button>
+        )}
       </div>
 
       <div className="relative mb-5 max-w-md">

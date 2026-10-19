@@ -22,6 +22,7 @@ import {
   RiLockLine, RiCheckLine,
 } from 'react-icons/ri';
 import { getLocId } from '@/lib/auth';
+import { useAccess } from '@/lib/access';
 
 const STATUS_PILLS = [
   { label: 'All', value: '' },
@@ -78,7 +79,8 @@ export default function DestinationPage() {
   const locId = getLocId();
   // HQ/admin (no fixed location) can re-open a submitted/locked record via "Enable Edit" —
   // matches the legacy app's loc_id === -1 escape hatch, same modern equivalent used in auth.ts.
-  const canForceUnlock = locId == null;
+  const canReceive = useAccess().canEdit('RECEIVING');
+  const canForceUnlock = locId == null && canReceive;
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -242,7 +244,7 @@ export default function DestinationPage() {
           {
             label: isLocked(row) ? (canForceUnlock ? 'Enable Edit' : 'Locked') : 'Receive',
             icon: RiInboxUnarchiveLine,
-            hidden: isLocked(row) && !canForceUnlock,
+            hidden: isLocked(row) ? !canForceUnlock : !canReceive,
             onClick: () => openReceive(row),
             testId: isLocked(row) ? `destination-enable-edit-button-${row.shipment_no}` : `destination-receive-button-${row.shipment_no}`,
           },

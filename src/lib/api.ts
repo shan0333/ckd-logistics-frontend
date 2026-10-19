@@ -93,4 +93,16 @@ export const downloadLogReport = (filter: OrginFilter) =>
     responseType: 'blob',
   });
 
+// ─── Logistics group access ─────────────────────────────────────────────────────
+export const getMyAccess = () => api.get('/logisticsAccess/me');
+export const getAccessGroups = () => api.get('/logisticsAccess/groups');
+export const createAccessGroup = (payload: { name: string; access: Record<string, string> }) =>
+  api.post('/logisticsAccess/groups', payload);
+export const updateAccessGroup = (id: number, payload: { name: string; access: Record<string, string> }) =>
+  api.put(`/logisticsAccess/groups/${id}`, payload);
+export const deleteAccessGroup = (id: number) => api.delete(`/logisticsAccess/groups/${id}`);
+export const getAccessUsers = () => api.get('/logisticsAccess/users');
+export const assignAccessGroup = (userId: number, groupId: number | null) =>
+  api.put(`/logisticsAccess/users/${userId}`, { groupId });
+
 export default api;

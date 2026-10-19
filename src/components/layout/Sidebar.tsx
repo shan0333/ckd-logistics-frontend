@@ -17,33 +17,36 @@ import {
   RiBox3Line,
   RiBarcodeBoxLine,
   RiFileShieldLine,
+  RiShieldUserLine,
 } from 'react-icons/ri';
 import type { IconType } from 'react-icons';
-import { clearSession, isAdmin } from '@/lib/auth';
+import { clearSession } from '@/lib/auth';
+import { useAccess, type AccessModule } from '@/lib/access';
 import { isReportEnabled, type ReportKey } from '@/lib/features';
 import { useEffect, useState } from 'react';
 import clsx from 'clsx';
 
-interface NavItem { label: string; href: string; icon: IconType; testId: string; adminOnly?: boolean; reportKey?: ReportKey }
+// module: shown only to users whose group can at least view it (lib/access.tsx); adminOnly: ADMIN /
+// SUPER ADMIN role only. Items with neither are shown to everyone.
+interface NavItem { label: string; href: string; icon: IconType; testId: string; module?: AccessModule; adminOnly?: boolean; reportKey?: ReportKey }
 
 const NAV_ITEMS: (NavItem | { label: string; icon: IconType; testId: string; base: string; children: NavItem[] })[] = [
   { label: 'Dashboard', href: '/dashboard',   icon: RiDashboardLine,      testId: 'nav-dashboard' },
-  { label: 'Shipments', href: '/orgin',       icon: RiTruckLine,          testId: 'nav-orgin' },
-  { label: 'Receiving', href: '/destination', icon: RiInboxUnarchiveLine, testId: 'nav-destination' },
+  { label: 'Shipments', href: '/orgin',       icon: RiTruckLine,          testId: 'nav-orgin', module: 'SHIPMENTS' },
+  { label: 'Receiving', href: '/destination', icon: RiInboxUnarchiveLine, testId: 'nav-destination', module: 'RECEIVING' },
   {
     label: 'Reports', icon: RiFileChart2Line, testId: 'nav-report', base: '/report',
     children: [
-      { label: 'Shipment Report', href: '/report/shipment', icon: RiTruckFill,      testId: 'nav-report-shipment', reportKey: 'shipment' },
-      { label: 'Billing Report',  href: '/report/billing',  icon: RiBillLine,       testId: 'nav-report-billing', reportKey: 'billing' },
-      { label: 'ODC Report',      href: '/report/odc',      icon: RiBox3Line,       testId: 'nav-report-odc', reportKey: 'odc' },
-      { label: 'Asset Report',    href: '/report/asset',    icon: RiBarcodeBoxLine, testId: 'nav-report-asset', reportKey: 'asset' },
-      // SOF carries billing + full history — hidden for non-admins here, and the backend
-      // (/reports/sof) rejects them too.
-      { label: 'SOF',             href: '/report/sof',      icon: RiFileShieldLine, testId: 'nav-report-sof', adminOnly: true, reportKey: 'sof' },
+      { label: 'Shipment Report', href: '/report/shipment', icon: RiTruckFill,      testId: 'nav-report-shipment', reportKey: 'shipment', module: 'SHIPMENT_REPORT' },
+      { label: 'Billing Report',  href: '/report/billing',  icon: RiBillLine,       testId: 'nav-report-billing', reportKey: 'billing', module: 'BILLING_REPORT' },
+      { label: 'ODC Report',      href: '/report/odc',      icon: RiBox3Line,       testId: 'nav-report-odc', reportKey: 'odc', module: 'ODC_REPORT' },
+      { label: 'Asset Report',    href: '/report/asset',    icon: RiBarcodeBoxLine, testId: 'nav-report-asset', reportKey: 'asset', module: 'ODC_REPORT' },
+      { label: 'SOF',             href: '/report/sof',      icon: RiFileShieldLine, testId: 'nav-report-sof', reportKey: 'sof', module: 'SOF' },
     ],
   },
-  { label: 'Transporters', href: '/transporter-master', icon: RiContactsLine, testId: 'nav-transporter-master' },
-  { label: 'Billing', href: '/billing-details', icon: RiBillLine, testId: 'nav-billing-details' },
+  { label: 'Transporters', href: '/transporter-master', icon: RiContactsLine, testId: 'nav-transporter-master', module: 'TRANSPORTER' },
+  { label: 'Billing', href: '/billing-details', icon: RiBillLine, testId: 'nav-billing-details', module: 'BILLING' },
+  { label: 'User Access', href: '/settings/user-access', icon: RiShieldUserLine, testId: 'nav-user-access', adminOnly: true },
 ];
 
 export default function Sidebar() {
@@ -52,7 +55,8 @@ export default function Sidebar() {
   useEffect(() => { setMounted(true); }, []);
   const pathname = usePathname();
   const router = useRouter();
-  const admin = mounted && isAdmin();
+  const { canView, isAccessAdmin } = useAccess();
+  const visible = (c: NavItem) => (!c.adminOnly || isAccessAdmin) && (!c.module || canView(c.module));
   // A group starts expanded whenever one of its pages is open; the user can still toggle it.
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const isActive = (href: string) => mounted && (pathname === href || pathname.startsWith(href + '/'));
@@ -77,7 +81,8 @@ export default function Sidebar() {
           // group is already open on first paint when one of its pages is showing.
           const inGroup = pathname === item.base || pathname.startsWith(item.base + '/');
           const isOpen = expanded[item.base] ?? inGroup;
-          const children = item.children.filter((c) => (!c.adminOnly || admin) && (!c.reportKey || isReportEnabled(c.reportKey)));
+          const children = item.children.filter((c) => visible(c) && (!c.reportKey || isReportEnabled(c.reportKey)));
+          if (children.length === 0) return null;
           // Only one report switched on (lib/features.ts) — a one-item dropdown is pointless, so the
           // group shows as a plain link to it instead.
           if (children.length === 1) {
@@ -112,6 +117,7 @@ export default function Sidebar() {
             </div>
           );
         }
+        if (!visible(item)) return null;
         const { label, href, icon: Icon, testId } = item;
         return (
           <Link key={href} href={href} data-testid={testId} onClick={() => setOpen(false)}

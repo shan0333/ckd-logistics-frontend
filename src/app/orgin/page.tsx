@@ -16,6 +16,7 @@ import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { formatDateTime, formatDateOnly } from '@/lib/dateTime';
 import { RiAddLine, RiDeleteBinLine, RiEyeLine } from 'react-icons/ri';
 import { isAdmin, getLocId } from '@/lib/auth';
+import { useAccess } from '@/lib/access';
 
 const STATUS_PILLS = [
   { label: 'All', value: '' },
@@ -63,6 +64,7 @@ export default function OrginPage() {
   const [pageSize, setPageSize] = useState(10);
   const [confirmRow, setConfirmRow] = useState<Orgin | null>(null);
   const admin = isAdmin();
+  const canEdit = useAccess().canEdit('SHIPMENTS');
   const locId = getLocId();
 
   const load = useCallback(async () => {
@@ -176,10 +178,12 @@ export default function OrginPage() {
           <h1 className="text-2xl font-bold text-gray-900">Shipments</h1>
           <p className="text-sm text-gray-500 mt-0.5">{filtered.length} of {all.length} records</p>
         </div>
-        <Link href="/orgin/new" data-testid="orgin-new-shipment-button"
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg text-sm font-medium flex items-center justify-center gap-2">
-          <RiAddLine /> New Shipment
-        </Link>
+        {canEdit && (
+          <Link href="/orgin/new" data-testid="orgin-new-shipment-button"
+            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg text-sm font-medium flex items-center justify-center gap-2">
+            <RiAddLine /> New Shipment
+          </Link>
+        )}
       </div>
 
       {/* Filters */}

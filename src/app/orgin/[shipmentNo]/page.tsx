@@ -18,6 +18,7 @@ import {
   RiBox3Line, RiImage2Line, RiTimeLine, RiAlertLine, RiRocket2Line, RiBarcodeBoxLine,
 } from 'react-icons/ri';
 import type { IconType } from 'react-icons';
+import { useAccess } from '@/lib/access';
 
 // Prefer the live Transporter Master name (joined server-side by transporter_master_id) over the
 // free-text snapshot — matches the Shipments list's own fallback logic.
@@ -69,6 +70,7 @@ function Field({ label, value, badge }: {
 
 export default function ShipmentViewPage() {
   const params = useParams<{ shipmentNo: string }>();
+  const canEdit = useAccess().canEdit('SHIPMENTS');
   const shipmentNo = decodeURIComponent(params.shipmentNo);
 
   const [loading, setLoading] = useState(true);
@@ -146,7 +148,7 @@ export default function ShipmentViewPage() {
             {row && <OverdueTag row={row} testId="orgin-view-overdue-tag" />}
           </div>
         </div>
-        {row?.curr_status === 'TRANSIT' && (
+        {row?.curr_status === 'TRANSIT' && canEdit && (
           <Link href={`/orgin/${encodeURIComponent(shipmentNo)}/edit`} data-testid="orgin-view-edit-link"
             className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 shadow-sm">
             <RiEditLine className="w-4 h-4" /> Edit
