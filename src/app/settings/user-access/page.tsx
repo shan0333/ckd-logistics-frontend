@@ -62,12 +62,17 @@ export default function UserAccessPage() {
   }, []);
   useEffect(() => { load(); }, [load]);
 
+  // Only this app's users (App access Allowed). The Super Admin can also show users without access,
+  // since that's where they allow someone into this app.
+  const [showBlocked, setShowBlocked] = useState(false);
+  const blockedCount = useMemo(() => users.filter((u) => !u.appAllowed && !u.superAdmin).length, [users]);
   const filteredUsers = useMemo(() => {
     const q = search.trim().toLowerCase();
     return users.filter((u) =>
-      (!q || u.email.toLowerCase().includes(q) || (u.username ?? '').toLowerCase().includes(q))
+      (u.appAllowed || u.superAdmin || (viewerIsSuperAdmin && showBlocked))
+      && (!q || u.email.toLowerCase().includes(q) || (u.username ?? '').toLowerCase().includes(q))
       && (groupFilter === '' || (groupFilter === 'none' ? u.groupId == null : String(u.groupId) === groupFilter)));
-  }, [users, search, groupFilter]);
+  }, [users, search, groupFilter, showBlocked, viewerIsSuperAdmin]);
 
   const assign = async (u: AccessUser, value: string) => {
     const groupId = value === '' ? null : Number(value);
@@ -195,6 +200,12 @@ export default function UserAccessPage() {
               {groups.map((g) => <option key={g.id} value={String(g.id)}>{g.name}</option>)}
               <option value="none">No group</option>
             </select>
+            {viewerIsSuperAdmin && (
+              <label className="flex items-center gap-2 px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white whitespace-nowrap cursor-pointer">
+                <input type="checkbox" data-testid="access-show-blocked" checked={showBlocked} onChange={(e) => setShowBlocked(e.target.checked)} />
+                Show users without access ({blockedCount})
+              </label>
+            )}
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
