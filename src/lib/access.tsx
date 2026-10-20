@@ -6,11 +6,12 @@ import { getMyAccess } from './api';
 // Group-based access (backend: LogisticsAccessService). Each module is VIEW, FULL or absent (no
 // access). The backend enforces the same rules on every API; this only drives what the UI shows.
 export type AccessModule =
-  | 'SHIPMENTS' | 'RECEIVING' | 'SHIPMENT_REPORT' | 'BILLING_REPORT'
+  | 'DASHBOARD' | 'SHIPMENTS' | 'RECEIVING' | 'SHIPMENT_REPORT' | 'BILLING_REPORT'
   | 'ODC_REPORT' | 'SOF' | 'TRANSPORTER' | 'BILLING';
 export type AccessLevel = 'VIEW' | 'FULL';
 
 export const ACCESS_MODULES: { key: AccessModule; label: string; report?: boolean }[] = [
+  { key: 'DASHBOARD', label: 'Dashboard' },
   { key: 'SHIPMENTS', label: 'Shipments' },
   { key: 'RECEIVING', label: 'Receiving' },
   { key: 'SHIPMENT_REPORT', label: 'Shipment Reports', report: true },
@@ -105,6 +106,7 @@ export const useAccess = () => useContext(AccessContext);
 
 // Which module (and level) each page needs. First match wins, so specific paths come first.
 const PAGE_RULES: { test: (p: string) => boolean; module?: AccessModule; level?: AccessLevel; adminOnly?: boolean }[] = [
+  { test: (p) => p === '/dashboard' || p.startsWith('/dashboard/'), module: 'DASHBOARD' },
   { test: (p) => p === '/orgin/new' || /^\/orgin\/[^/]+\/edit$/.test(p), module: 'SHIPMENTS', level: 'FULL' },
   { test: (p) => p === '/orgin' || p.startsWith('/orgin/'), module: 'SHIPMENTS' },
   { test: (p) => p.startsWith('/destination'), module: 'RECEIVING' },
@@ -117,6 +119,19 @@ const PAGE_RULES: { test: (p: string) => boolean; module?: AccessModule; level?:
   { test: (p) => p.startsWith('/settings/user-access'), adminOnly: true },
   { test: (p) => p === '/users' || p.startsWith('/users/'), adminOnly: true },
 ];
+
+// Where to land after login / from "no access": the Dashboard when the group has it, otherwise the
+// first menu page the group can open.
+const HOME_ORDER: { path: string; module: AccessModule }[] = [
+  { path: '/dashboard', module: 'DASHBOARD' }, { path: '/orgin', module: 'SHIPMENTS' }, { path: '/destination', module: 'RECEIVING' },
+  { path: '/report/shipment', module: 'SHIPMENT_REPORT' }, { path: '/report/billing', module: 'BILLING_REPORT' },
+  { path: '/report/odc', module: 'ODC_REPORT' }, { path: '/report/sof', module: 'SOF' },
+  { path: '/transporter-master', module: 'TRANSPORTER' }, { path: '/billing-details', module: 'BILLING' },
+];
+export function homePathFor(access: MyAccess | null): string {
+  if (!access) return '/dashboard';
+  return HOME_ORDER.find((h) => !!access.modules?.[h.module])?.path ?? '/dashboard';
+}
 
 export function pageAllowed(pathname: string, state: AccessState): boolean {
   const rule = PAGE_RULES.find((r) => r.test(pathname));

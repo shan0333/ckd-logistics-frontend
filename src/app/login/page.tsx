@@ -6,7 +6,7 @@ import { RiLockLine, RiUser3Line, RiEyeLine, RiEyeOffLine, RiAlertLine, RiLoader
 import { authenticate } from '@/lib/api';
 import { LOGO_URL } from '@/lib/branding';
 import { clearSession, saveSession } from '@/lib/auth';
-import { fetchMyAccess, writeAccessCache } from '@/lib/access';
+import { fetchMyAccess, homePathFor, writeAccessCache } from '@/lib/access';
 
 export default function LoginPage() {
   const [username, setUsername] = useState('');
@@ -36,6 +36,7 @@ export default function LoginPage() {
       document.cookie = `logistics_token=${data.token}; path=/; SameSite=Strict`;
       // App-level access: a user blocked from Logistics (User Access) can't sign in here. If the
       // access check itself fails, let the login through; the pages re-check on load.
+      let home = '/dashboard';
       try {
         const access = await fetchMyAccess();
         if (access && !access.appAllowed) {
@@ -44,9 +45,9 @@ export default function LoginPage() {
           setLoginError("You don't have access to the Logistics application. Please contact your admin.");
           return;
         }
-        if (access) writeAccessCache(access);
+        if (access) { writeAccessCache(access); home = homePathFor(access); }
       } catch { /* pages re-check on load */ }
-      window.location.href = `${process.env.NEXT_PUBLIC_BASE_PATH || ''}/dashboard`;
+      window.location.href = `${process.env.NEXT_PUBLIC_BASE_PATH || ''}${home}`;
     } catch (err: any) {
       const d = err?.response?.data;
       const msg = (typeof d === 'string' ? d : d?.message) || 'Invalid email or password.';

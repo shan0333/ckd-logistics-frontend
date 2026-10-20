@@ -33,7 +33,7 @@ import BrandMark from './BrandMark';
 interface NavItem { label: string; href: string; icon: IconType; testId: string; module?: AccessModule; adminOnly?: boolean; reportKey?: ReportKey }
 
 const NAV_ITEMS: (NavItem | { label: string; icon: IconType; testId: string; base: string; children: NavItem[] })[] = [
-  { label: 'Dashboard', href: '/dashboard',   icon: RiDashboardLine,      testId: 'nav-dashboard' },
+  { label: 'Dashboard', href: '/dashboard',   icon: RiDashboardLine,      testId: 'nav-dashboard', module: 'DASHBOARD' },
   { label: 'Shipments', href: '/orgin',       icon: RiTruckLine,          testId: 'nav-orgin', module: 'SHIPMENTS' },
   { label: 'Receiving', href: '/destination', icon: RiInboxUnarchiveLine, testId: 'nav-destination', module: 'RECEIVING' },
   {

@@ -10,11 +10,12 @@ import {
 import {
   RiTruckLine, RiRouteLine, RiInboxUnarchiveLine, RiAlarmWarningLine, RiLoginBoxLine, RiInboxArchiveLine,
   RiMoneyRupeeCircleLine, RiHandCoinLine, RiMapPinLine, RiBillLine, RiContactsLine, RiBox3Line,
-  RiCalendarCheckLine, RiFileAddLine, RiBarcodeBoxLine, RiLoader4Line, RiDashboardLine, RiFilePdf2Line, RiToolsLine, RiLineChartLine,
+  RiCalendarCheckLine, RiFileAddLine, RiBarcodeBoxLine, RiLoader4Line, RiDashboardLine, RiFilePdf2Line, RiLineChartLine,
 } from 'react-icons/ri';
 import { downloadDashboardAsPdf } from '@/lib/pdfExport';
 import { getUsername } from '@/lib/auth';
 import { getDashboardAccess, getDashboardWeekly } from '@/lib/api';
+import NoAccess from '@/components/ui/NoAccess';
 import PeriodFilter, { periodCaption } from '@/components/dashboard/PeriodFilter';
 import Widget, { AXIS, GRID, LEGEND, PdfButton, SERIES, STATUS, TOOLTIP, todayStr, useWidgetData, usePeriod } from '@/components/dashboard/Widget';
 
@@ -57,7 +58,9 @@ function Tile({ icon: Icon, label, value, hint, tone = 'blue', testId }: {
   );
 }
 
-function SummaryCards({ sectionRef }: { sectionRef: (el: HTMLElement | null) => void }) {
+// Tiles follow the user's group: shipment tiles need Shipments/Receiving, billing tiles need
+// Billing/Billing Reports (the backend leaves the other figures out of /dashboard2/cards too).
+function SummaryCards({ sectionRef, shipments, billing }: { sectionRef: (el: HTMLElement | null) => void; shipments: boolean; billing: boolean }) {
   const [period, setPeriod] = usePeriod();
   const { data, loading, error } = useWidgetData<Cards>('cards', period);
   const ref = useRef<HTMLElement | null>(null);
@@ -79,6 +82,7 @@ function SummaryCards({ sectionRef }: { sectionRef: (el: HTMLElement | null) => 
         <div className="min-h-[120px] flex items-center justify-center text-red-600 text-sm">{error ?? 'Could not load the summary.'}</div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+          {shipments && <>
           <Tile testId="dash-card-total" icon={RiTruckLine} label="Total Shipments" value={num(data.total)} />
           <Tile testId="dash-card-intransit" icon={RiRouteLine} tone="orange" label="In Transit" value={num(data.inTransit)}
             hint={data.overdue ? `incl. ${num(data.overdue)} overdue` : 'vehicle not reported yet'} />
@@ -87,12 +91,15 @@ function SummaryCards({ sectionRef }: { sectionRef: (el: HTMLElement | null) => 
           <Tile testId="dash-card-overdue" icon={RiAlarmWarningLine} tone="red" label="Overdue" value={num(data.overdue)} hint="ETA date passed, vehicle not reported" />
           <Tile testId="dash-card-inward-odc" icon={RiLoginBoxLine} tone="violet" label="Inward ODC" value={num(data.inwardOdc)} hint="shipments with ODC cabins" />
           <Tile testId="dash-card-receiving-odc" icon={RiInboxArchiveLine} tone="amber" label="Receiving ODC" value={num(data.receivingOdc)} hint="reported in this period, with ODC document" />
+          </>}
+          {billing && <>
           <Tile testId="dash-card-transporter-billing" icon={RiMoneyRupeeCircleLine} tone="slate" label="Transporter Billing" value={inr(data.transporterBilling)}
             hint={`${num(data.billedShipments)} billed shipment${data.billedShipments === 1 ? '' : 's'} (final + draft)`} />
           <Tile testId="dash-card-customer-billing" icon={RiHandCoinLine} tone="green" label="Customer Billing" value={inr(data.customerBilling)}
             hint={`${num(data.billedShipments)} billed shipment${data.billedShipments === 1 ? '' : 's'} (final + draft)`} />
           <Tile testId="dash-card-revenue" icon={RiLineChartLine} tone={data.revenue < 0 ? 'red' : 'blue'} label="Revenue" value={inr(data.revenue)}
             hint="customer billing − transporter billing" />
+          </>}
         </div>
       )}
     </section>
@@ -132,7 +139,7 @@ function DestinationChart() {
 }
 
 // ── Invoice status ─────────────────────────────────────────────────────────────────────────
-function InvoiceStatusChart() {
+function InvoiceStatusChart({ wide = false }: { wide?: boolean }) {
   const [period, setPeriod] = usePeriod();
   const { data, loading, error } = useWidgetData<InvoiceStatus>('invoiceStatus', period);
   const parts = data ? [
@@ -142,7 +149,7 @@ function InvoiceStatusChart() {
   ] : [];
   const total = data?.billable ?? 0;
   return (
-    <Widget testId="dash-invoice" exportName="invoice-status" title="Invoice Status" icon={RiBillLine}
+    <Widget testId="dash-invoice" exportName="invoice-status" title="Invoice Status" icon={RiBillLine} className={wide ? 'lg:col-span-3' : undefined}
       subtitle={`Received shipments, LR date ${periodCaption(period)}`}
       period={period} onPeriod={setPeriod} loading={loading} error={error} empty={!loading && !error && total === 0}
       table={{ columns: [{ key: 'label', label: 'Status' }, { key: 'value', label: 'Shipments', numeric: true }], rows: parts as never }}>
@@ -304,35 +311,40 @@ function WeeklyCharts() {
   );
 }
 
-// Rollout gate: the backend decides who sees the new dashboard (dashboard.v2.allowed-users); everyone
-// else gets this notice. The /dashboard2 endpoints refuse non-allowed users too, so this isn't just UI.
-function UnderDevelopment() {
-  return (
-    <div data-testid="dash-under-development" className="bg-white rounded-xl shadow-sm border border-slate-200 p-10 md:p-16 text-center max-w-3xl mx-auto mt-6">
-      <span className="w-14 h-14 mx-auto rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mb-4"><RiToolsLine className="w-7 h-7" /></span>
-      <h1 className="text-xl font-bold text-slate-800">Dashboard under development</h1>
-      <p className="text-sm text-slate-500 mt-2">
-        A new dashboard is being prepared and will be available soon. Meanwhile, Shipments, Receiving, Reports and Billing work as usual.
-      </p>
-    </div>
-  );
-}
+
+// What the dashboard shows depends on the user's group (backend /dashboard2/access): the page needs
+// the Dashboard module; shipment charts need Shipments/Receiving; billing charts need Billing/Billing Reports.
+type DashAccess = { allowed: boolean; shipments: boolean; billing: boolean };
 
 export default function DashboardPage() {
-  const [access, setAccess] = useState<'checking' | 'allowed' | 'denied'>('checking');
+  const [access, setAccess] = useState<DashAccess | 'checking' | 'error'>('checking');
   useEffect(() => {
     getDashboardAccess()
-      .then((res) => setAccess(res.data?.data?.[0]?.allowed ? 'allowed' : 'denied'))
-      .catch(() => setAccess('denied'));
+      .then((res) => {
+        const a = res.data?.data?.[0] ?? {};
+        setAccess({ allowed: !!a.allowed, shipments: !!a.shipments, billing: !!a.billing });
+      })
+      .catch(() => setAccess('error'));
   }, []);
   if (access === 'checking') {
     return <div className="min-h-[300px] flex items-center justify-center text-slate-400 text-sm gap-2"><RiLoader4Line className="w-4 h-4 animate-spin" /> Loading…</div>;
   }
-  if (access === 'denied') return <UnderDevelopment />;
-  return <Dashboard />;
+  if (access === 'error') return <div className="min-h-[300px] flex items-center justify-center text-red-600 text-sm">Could not load the dashboard.</div>;
+  if (!access.allowed) return <NoAccess />;
+  if (!access.shipments && !access.billing) return <NothingToShow />;
+  return <Dashboard shipments={access.shipments} billing={access.billing} />;
 }
 
-function Dashboard() {
+function NothingToShow() {
+  return (
+    <div data-testid="dash-nothing" className="bg-white rounded-xl shadow-sm border border-slate-200 p-10 text-center max-w-3xl mx-auto mt-6">
+      <p className="text-sm font-semibold text-slate-600">Your group has no dashboard charts.</p>
+      <p className="text-xs text-slate-400 mt-1">Charts appear for groups with Shipments, Receiving or Billing access. Please contact your admin if you need them.</p>
+    </div>
+  );
+}
+
+function Dashboard({ shipments, billing }: { shipments: boolean; billing: boolean }) {
   // Full-dashboard PDF: each block below is captured as its own image so pages only ever break
   // *between* blocks (see lib/pdfExport). Side-by-side widgets are captured as their whole row,
   // so the PDF keeps the on-screen layout. What's captured is exactly what's on screen — each
@@ -384,19 +396,21 @@ function Dashboard() {
         </button>
       </div>
 
-      <SummaryCards sectionRef={(el) => { summaryRef.current = el; }} />
+      <SummaryCards sectionRef={(el) => { summaryRef.current = el; }} shipments={shipments} billing={billing} />
 
       <div ref={row1Ref} className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-        <DestinationChart />
-        <InvoiceStatusChart />
+        {shipments && <DestinationChart />}
+        {billing && <InvoiceStatusChart wide={!shipments} />}
       </div>
 
-      <div ref={row2Ref} className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-        <TransporterChart />
-        <InwardOdcChart />
-      </div>
+      {shipments && (
+        <div ref={row2Ref} className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+          <TransporterChart />
+          <InwardOdcChart />
+        </div>
+      )}
 
-      <div ref={weeklyRef}><WeeklyCharts /></div>
+      {shipments && <div ref={weeklyRef}><WeeklyCharts /></div>}
     </div>
   );
 }
