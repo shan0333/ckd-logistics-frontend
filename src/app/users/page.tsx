@@ -266,11 +266,11 @@ export default function UsersPage() {
                 {form.otherRoles.length > 0 && <p className="text-xs text-slate-500 mt-1">Also keeps: {form.otherRoles.join(', ')}</p>}
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Home Location</label>
-                <select data-testid="users-location" className={INPUT} value={form.locId} onChange={(e) => setForm({ ...form, locId: e.target.value })}>
-                  <option value="">All locations (HQ)</option>
-                  {locations.map((l) => <option key={l.id} value={String(l.id)}>{l.name}</option>)}
-                </select>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Application</label>
+                {/* Fixed: a user created here gets Logistics only; other apps are the Super Admin's call
+                    (User Access). Home location isn't set here - it stays as it is (new users: all). */}
+                <input data-testid="users-application" className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-slate-100 text-slate-600 cursor-not-allowed" readOnly disabled
+                  value={form.id ? (rows.find((r) => r.id === form.id)?.ckdBlocked === false ? 'Logistics + CKD' : 'Logistics') : 'Logistics'} />
               </div>
               <div className="sm:col-span-2">
                 <label className="block text-sm font-medium text-slate-700 mb-1">Logistics group</label>
