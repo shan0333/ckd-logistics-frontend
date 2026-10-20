@@ -18,6 +18,7 @@ import {
   RiBarcodeBoxLine,
   RiFileShieldLine,
   RiShieldUserLine,
+  RiUserSettingsLine,
 } from 'react-icons/ri';
 import type { IconType } from 'react-icons';
 import { clearSession } from '@/lib/auth';
@@ -46,6 +47,7 @@ const NAV_ITEMS: (NavItem | { label: string; icon: IconType; testId: string; bas
   },
   { label: 'Transporters', href: '/transporter-master', icon: RiContactsLine, testId: 'nav-transporter-master', module: 'TRANSPORTER' },
   { label: 'Billing', href: '/billing-details', icon: RiBillLine, testId: 'nav-billing-details', module: 'BILLING' },
+  { label: 'Users', href: '/users', icon: RiUserSettingsLine, testId: 'nav-users', adminOnly: true },
   { label: 'User Access', href: '/settings/user-access', icon: RiShieldUserLine, testId: 'nav-user-access', adminOnly: true },
 ];
 

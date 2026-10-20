@@ -115,6 +115,7 @@ const PAGE_RULES: { test: (p: string) => boolean; module?: AccessModule; level?:
   { test: (p) => p.startsWith('/transporter-master'), module: 'TRANSPORTER' },
   { test: (p) => p.startsWith('/billing-details'), module: 'BILLING' },
   { test: (p) => p.startsWith('/settings/user-access'), adminOnly: true },
+  { test: (p) => p === '/users' || p.startsWith('/users/'), adminOnly: true },
 ];
 
 export function pageAllowed(pathname: string, state: AccessState): boolean {

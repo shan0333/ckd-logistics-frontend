@@ -42,6 +42,12 @@ export const deleteOrgin = (payload: any) => api.post('/deleteOrgin', payload);
 export const getOrginCustomer = () => api.get('/getOrginCustomer');
 export const getVehicletype = () => api.get('/getVehicletype');
 export const getLocationList = () => api.get('/getLocation');
+
+// ─── Users (admin) ─────────────────────────────────────────────────────────────
+export const getUserList = () => api.get('/getUser');
+export const saveUser = (payload: any) => api.post('/createUser', payload);
+export const resetUserPassword = (payload: any) => api.post('/resetPassword', payload);
+export const viewUserPassword = (id: any) => api.get(`/view/${id}`);
 export const getOrginImages = (shipmentNo: string, flag: 'ORGIN' | 'DEST') =>
   api.get(`/getImage/${shipmentNo}/${flag}`);
 export const deleteOrginImage = (id: number) => api.get(`/deleteImage/${id}`);
