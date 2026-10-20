@@ -26,6 +26,7 @@ import { useAccess, type AccessModule } from '@/lib/access';
 import { isReportEnabled, type ReportKey } from '@/lib/features';
 import { useEffect, useState } from 'react';
 import clsx from 'clsx';
+import BrandMark from './BrandMark';
 
 // module: shown only to users whose group can at least view it (lib/access.tsx); adminOnly: ADMIN /
 // SUPER ADMIN role only. Items with neither are shown to everyone.
@@ -148,7 +149,7 @@ export default function Sidebar() {
         <button onClick={() => setOpen(true)} className="text-white">
           <RiMenuLine className="w-6 h-6" />
         </button>
-        <span className="text-white font-bold text-lg">CKD Logistics</span>
+        <BrandMark name="CKD Logistics" />
         <div className="w-6" />
       </div>
 
@@ -168,7 +169,7 @@ export default function Sidebar() {
         )}
       >
         <div className="flex items-center justify-between px-4 h-14 border-b border-slate-700">
-          <span className="text-white font-bold text-lg">CKD Logistics</span>
+          <BrandMark name="CKD Logistics" />
           <button onClick={() => setOpen(false)} className="text-slate-300">
             <RiCloseLine className="w-6 h-6" />
           </button>
@@ -179,7 +180,7 @@ export default function Sidebar() {
       {/* Desktop sidebar */}
       <aside className="hidden lg:flex flex-col w-56 bg-slate-900 min-h-screen fixed top-0 left-0">
         <div className="flex items-center px-4 h-14 border-b border-slate-700">
-          <span className="text-white font-bold text-base">CKD Logistics</span>
+          <BrandMark name="CKD Logistics" className="text-base" />
         </div>
         <NavLinks />
       </aside>

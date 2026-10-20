@@ -2,8 +2,9 @@
 
 import { useState } from 'react';
 import toast from 'react-hot-toast';
-import { RiTruckLine, RiLockLine, RiUser3Line, RiEyeLine, RiEyeOffLine, RiAlertLine, RiLoader4Line } from 'react-icons/ri';
+import { RiLockLine, RiUser3Line, RiEyeLine, RiEyeOffLine, RiAlertLine, RiLoader4Line } from 'react-icons/ri';
 import { authenticate } from '@/lib/api';
+import { LOGO_URL } from '@/lib/branding';
 import { clearSession, saveSession } from '@/lib/auth';
 import { fetchMyAccess, writeAccessCache } from '@/lib/access';
 
@@ -59,12 +60,10 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center px-4"
       style={{ background: 'linear-gradient(135deg,#dbeafe 0%,#ede9fe 35%,#d1fae5 65%,#dbeafe 100%)' }}>
       <div className="w-full max-w-[400px]">
-        <div className="flex items-center justify-center gap-2 mb-8">
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center shadow"
-            style={{ background: 'linear-gradient(135deg,#1e3a8a,#1d4ed8)' }}>
-            <RiTruckLine className="w-5 h-5 text-white" />
-          </div>
-          <span className="font-bold text-xl text-slate-800">CKD Logistics</span>
+        <div className="flex flex-col items-center gap-2 mb-8">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={LOGO_URL} alt="SPACEAGE CONNECT" className="w-full max-w-[300px] h-auto" />
+          <span className="font-bold text-lg text-slate-700 tracking-wide">CKD Logistics</span>
         </div>
 
         <div className="bg-white/70 backdrop-blur-xl border border-white/80 shadow-xl rounded-2xl p-8">
