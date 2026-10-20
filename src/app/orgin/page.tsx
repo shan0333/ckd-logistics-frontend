@@ -15,7 +15,7 @@ import ActionMenu from '@/components/ui/ActionMenu';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { formatDateTime, formatDateOnly } from '@/lib/dateTime';
 import { RiAddLine, RiDeleteBinLine, RiEyeLine } from 'react-icons/ri';
-import { isAdmin, getLocId } from '@/lib/auth';
+import { isAdmin } from '@/lib/auth';
 import { useAccess } from '@/lib/access';
 
 const STATUS_PILLS = [
@@ -65,13 +65,12 @@ export default function OrginPage() {
   const [confirmRow, setConfirmRow] = useState<Orgin | null>(null);
   const admin = isAdmin();
   const canEdit = useAccess().canEdit('SHIPMENTS');
-  const locId = getLocId();
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const res = await getOrginList({
-        loc_id: locId != null ? String(locId) : '',
+        loc_id: '', // no location filter - every user sees all routes
         flag: 'O',
         status: statusFilter ? [statusFilter] : [],
         fromDate, toDate,
@@ -79,7 +78,7 @@ export default function OrginPage() {
       setAll(res.data?.data ?? []);
     } catch { toast.error('Failed to load shipments'); }
     finally { setLoading(false); }
-  }, [locId, statusFilter, fromDate, toDate]);
+  }, [statusFilter, fromDate, toDate]);
 
   useEffect(() => { load(); }, [load]);
 

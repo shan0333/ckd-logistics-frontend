@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import { RiAddLine, RiDeleteBinLine, RiEditLine, RiEyeLine, RiKeyLine } from 'react-icons/ri';
 import {
-  getUserList, saveUser, resetUserPassword, viewUserPassword, getLocationList,
+  getUserList, saveUser, resetUserPassword, viewUserPassword,
   getAccessUsers, getAccessGroups, assignAccessGroup,
 } from '@/lib/api';
 import DataTable, { Column } from '@/components/ui/DataTable';
@@ -22,7 +22,6 @@ interface Row {
   userName: string;
   email: string;
   roles: string[];
-  locId: number | null;
   customerId: number | null;
   groupId: number | null;
   groupName: string | null;
@@ -30,10 +29,9 @@ interface Row {
   ckdBlocked: boolean;
 }
 interface Group { id: number; name: string }
-interface Location { id: number; name: string }
-interface Form { id?: number; userName: string; email: string; admin: boolean; locId: string; groupId: string; customerId: number | null; otherRoles: string[]; superAdmin: boolean }
+interface Form { id?: number; userName: string; email: string; admin: boolean; groupId: string; customerId: number | null; otherRoles: string[]; superAdmin: boolean }
 
-const EMPTY: Form = { userName: '', email: '', admin: false, locId: '', groupId: '', customerId: null, otherRoles: [], superAdmin: false };
+const EMPTY: Form = { userName: '', email: '', admin: false, groupId: '', customerId: null, otherRoles: [], superAdmin: false };
 const INPUT = 'w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white';
 const BTN_PRI = 'px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 disabled:opacity-60';
 const BTN_SEC = 'px-4 py-2 border border-slate-300 text-slate-700 text-sm font-semibold rounded-lg hover:bg-slate-50';
@@ -41,7 +39,6 @@ const BTN_SEC = 'px-4 py-2 border border-slate-300 text-slate-700 text-sm font-s
 export default function UsersPage() {
   const [rows, setRows] = useState<Row[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
-  const [locations, setLocations] = useState<Location[]>([]);
   const [loading, setLoading] = useState(true);
   const [spinning, setSpinning] = useState(false);
   const [search, setSearch] = useState('');
@@ -56,7 +53,7 @@ export default function UsersPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [u, a, g, l] = await Promise.all([getUserList(), getAccessUsers(), getAccessGroups(), getLocationList()]);
+      const [u, a, g] = await Promise.all([getUserList(), getAccessUsers(), getAccessGroups()]);
       const users: any[] = u.data?.data ?? [];
       const access = new Map<number, any>((a.data?.data ?? []).map((x: any) => [Number(x.id), x]));
       setRows(users
@@ -68,7 +65,6 @@ export default function UsersPage() {
             userName: x.userName ?? acc.username ?? '',
             email: x.email ?? acc.email ?? '',
             roles: String(x.role ?? acc.roles ?? '').split(',').map((r: string) => r.trim()).filter(Boolean),
-            locId: x.locId ?? null,
             customerId: x.customerId ?? null,
             groupId: acc.groupId ?? null,
             groupName: acc.groupName ?? null,
@@ -79,7 +75,6 @@ export default function UsersPage() {
         })
         .filter((x): x is Row & { appAllowed: boolean } => !!x && (x.appAllowed || x.superAdmin)));
       setGroups(g.data?.data ?? []);
-      setLocations(l.data?.data ?? []);
     } catch (e: any) {
       toast.error(e?.response?.data?.message || 'Failed to load users');
     } finally {
@@ -93,11 +88,10 @@ export default function UsersPage() {
     return !q ? rows : rows.filter((r) => r.userName.toLowerCase().includes(q) || r.email.toLowerCase().includes(q));
   }, [rows, search]);
   const paged = useMemo(() => filtered.slice(page * pageSize, (page + 1) * pageSize), [filtered, page, pageSize]);
-  const locName = (id: number | null) => (id == null ? 'All locations' : locations.find((l) => Number(l.id) === Number(id))?.name ?? `#${id}`);
 
   const openEdit = (r: Row) => setForm({
     id: r.id, userName: r.userName, email: r.email, admin: r.roles.map((x) => x.toUpperCase()).includes('ADMIN'),
-    locId: r.locId == null ? '' : String(r.locId), groupId: r.groupId == null ? '' : String(r.groupId), customerId: r.customerId,
+    groupId: r.groupId == null ? '' : String(r.groupId), customerId: r.customerId,
     otherRoles: r.roles.filter((x) => !['ADMIN', 'USER'].includes(x.toUpperCase())), superAdmin: r.superAdmin,
   });
 
@@ -119,7 +113,7 @@ export default function UsersPage() {
       const res = await saveUser({
         ...(form.id ? { id: form.id, customerId: form.customerId } : {}),
         userName: form.userName.trim(), email: form.email.trim(), roles,
-        locId: form.locId === '' ? null : Number(form.locId), app: 'LOGISTICS',
+        app: 'LOGISTICS', // saves loc_id as null - home location is no longer used
       });
       const msg: string = res.data?.message ?? '';
       if (/already exists|unexpected error/i.test(msg)) {
@@ -180,7 +174,6 @@ export default function UsersPage() {
       ),
     },
     { key: 'groupName', label: 'Group', render: (r) => r.superAdmin || r.roles.includes('ADMIN') ? <span className="text-slate-400">Full access</span> : (r.groupName ?? <span className="text-slate-400">No group (default)</span>) },
-    { key: 'locId', label: 'Home Location', render: (r) => locName(r.locId) },
     { key: 'apps', label: 'Apps', render: (r) => (r.superAdmin || !r.ckdBlocked ? 'Logistics + CKD' : 'Logistics') },
     {
       key: 'actions', label: 'Actions',
@@ -267,8 +260,7 @@ export default function UsersPage() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Application</label>
-                {/* Fixed: a user created here gets Logistics only; other apps are the Super Admin's call
-                    (User Access). Home location isn't set here - it stays as it is (new users: all). */}
+                {/* Fixed: a user created here gets Logistics only; other apps are the Super Admin's call (User Access). */}
                 <input data-testid="users-application" className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-slate-100 text-slate-600 cursor-not-allowed" readOnly disabled
                   value={form.id ? (rows.find((r) => r.id === form.id)?.ckdBlocked === false ? 'Logistics + CKD' : 'Logistics') : 'Logistics'} />
               </div>

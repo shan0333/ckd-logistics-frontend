@@ -21,7 +21,7 @@ import {
   RiImageLine, RiEyeLine, RiInboxUnarchiveLine, RiInboxArchiveLine, RiImage2Line,
   RiLockLine, RiCheckLine,
 } from 'react-icons/ri';
-import { getLocId } from '@/lib/auth';
+import { isAdmin } from '@/lib/auth';
 import { useAccess } from '@/lib/access';
 
 const STATUS_PILLS = [
@@ -76,17 +76,15 @@ export default function DestinationPage() {
   const [receiveExistingKinds, setReceiveExistingKinds] = useState<Set<DocKind>>(new Set());
   const [unlocked, setUnlocked] = useState(false);
   const [confirmSubmit, setConfirmSubmit] = useState(false);
-  const locId = getLocId();
-  // HQ/admin (no fixed location) can re-open a submitted/locked record via "Enable Edit" —
-  // matches the legacy app's loc_id === -1 escape hatch, same modern equivalent used in auth.ts.
+  // Re-opening a submitted/locked record ("Enable Edit") is Admin-only, like Billing's Enable Edit.
   const canReceive = useAccess().canEdit('RECEIVING');
-  const canForceUnlock = locId == null && canReceive;
+  const canForceUnlock = isAdmin() && canReceive;
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const res = await getOrginList({
-        loc_id: locId != null ? String(locId) : '',
+        loc_id: '', // no location filter - every user sees all routes
         flag: 'D',
         status: statusFilter ? [statusFilter] : [],
         fromDate, toDate,
@@ -94,7 +92,7 @@ export default function DestinationPage() {
       setAll(res.data?.data ?? []);
     } catch { toast.error('Failed to load inbound shipments'); }
     finally { setLoading(false); }
-  }, [locId, statusFilter, fromDate, toDate]);
+  }, [statusFilter, fromDate, toDate]);
 
   useEffect(() => { load(); }, [load]);
 

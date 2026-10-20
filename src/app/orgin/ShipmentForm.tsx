@@ -23,7 +23,6 @@ import {
   RiTruckLine, RiTimeLine, RiImage2Line, RiBox3Line, RiFileAddLine, RiEditLine,
   RiBarcodeBoxLine, RiArrowGoBackLine,
 } from 'react-icons/ri';
-import { getLocId } from '@/lib/auth';
 
 const EMPTY_ORG: Orgin = {
   shipment_no: '', vehicle_no: '', lr_no: '', lr_date: '',
@@ -67,7 +66,6 @@ interface Props {
 // curr_status='TRANSIT' — see the backend's org_status='O' guard on UPDATE_ORGIN_DETAILS).
 export default function ShipmentForm({ mode, initial, existingOdcLots, existingImages, existingAssets, returnTo }: Props) {
   const router = useRouter();
-  const locId = getLocId();
 
   const [spinning, setSpinning] = useState(false);
   // vehicle_type is overloaded — reads back as the display name, but the <select> below (and the
@@ -144,15 +142,11 @@ export default function ShipmentForm({ mode, initial, existingOdcLots, existingI
       const nested = res.data?.data;
       const raw: Location[] = Array.isArray(nested) ? nested : Array.isArray(res.data) ? res.data : [];
       const list = raw.filter((l) => l.name !== 'Logistics');
-      if (locId == null) {
-        setRouteFrom(list);
-        setRouteTo(list);
-      } else {
-        setRouteFrom(list.filter((l) => l.id === locId));
-        setRouteTo(list.filter((l) => l.id !== locId));
-      }
+      // Any route can be picked - users are no longer tied to a home location.
+      setRouteFrom(list);
+      setRouteTo(list);
     }).catch(() => {});
-  }, [locId]);
+  }, []);
 
   const checkDup = async () => {
     if (mode === 'edit') return; // Shipment No is fixed once created — never re-checked.

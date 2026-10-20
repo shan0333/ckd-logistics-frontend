@@ -31,7 +31,6 @@ export default function LoginPage() {
         id: data.id,
         roles: data.roles,
         refreshToken: data.refreshToken,
-        locId: data.locId,
       });
       document.cookie = `logistics_token=${data.token}; path=/; SameSite=Strict`;
       // App-level access: a user blocked from Logistics (User Access) can't sign in here. If the
