@@ -11,10 +11,11 @@ import { ACCESS_MODULES, type AccessLevel, type AccessModule } from '@/lib/acces
 import Modal from '@/components/ui/Modal';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import Spinner from '@/components/ui/Spinner';
+import { getRoles } from '@/lib/auth';
 
 interface Group { id: number; name: string; members: number; access: Partial<Record<AccessModule, AccessLevel>> }
 interface AccessUser {
-  id: number; username: string | null; email: string; roles: string | null; adminRole: boolean;
+  id: number; username: string | null; email: string; roles: string | null; adminRole: boolean; superAdmin: boolean;
   groupId: number | null; groupName: string | null; appAllowed: boolean;
 }
 type Choice = AccessLevel | 'NONE';
@@ -40,6 +41,8 @@ export default function UserAccessPage() {
   const [groupFilter, setGroupFilter] = useState<string>('');
   const [savingUser, setSavingUser] = useState<number | null>(null);
   const [confirmBlock, setConfirmBlock] = useState<AccessUser | null>(null);
+  // App access (which app a user may open) is the Super Admin's call only - backend enforces it too.
+  const viewerIsSuperAdmin = getRoles().some((r) => r.toUpperCase() === 'SUPER ADMIN');
 
   const [editing, setEditing] = useState<{ id: number | null; name: string; access: Record<AccessModule, Choice> } | null>(null);
   const [savingGroup, setSavingGroup] = useState(false);
@@ -212,8 +215,14 @@ export default function UserAccessPage() {
                     </td>
                     <td className="px-4 py-2.5 text-slate-600">{u.roles || '—'}</td>
                     <td className="px-4 py-2.5">
-                      {u.adminRole ? (
+                      {u.superAdmin ? (
                         <span className="text-xs font-semibold text-emerald-700">Allowed</span>
+                      ) : !viewerIsSuperAdmin ? (
+                        <span data-testid={`access-user-app-${u.id}`} title="Only the Super Admin can change App access"
+                          className={clsx('px-2.5 py-1 rounded-full text-xs font-semibold border',
+                            u.appAllowed ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-red-50 border-red-200 text-red-700')}>
+                          {u.appAllowed ? 'Allowed' : 'Blocked'}
+                        </span>
                       ) : (
                         <button data-testid={`access-user-app-${u.id}`} disabled={savingUser === u.id}
                           onClick={() => (u.appAllowed ? setConfirmBlock(u) : saveAppAccess(u, true))}
@@ -232,7 +241,8 @@ export default function UserAccessPage() {
                         <option value="">No group (default)</option>
                         {groups.map((g) => <option key={g.id} value={String(g.id)}>{g.name}</option>)}
                       </select>
-                      {u.adminRole && <p className="text-[11px] text-amber-600 mt-1">Admin role — always has full access</p>}
+                      {u.superAdmin ? <p className="text-[11px] text-amber-600 mt-1">Super Admin — always has full access</p>
+                        : u.adminRole && <p className="text-[11px] text-amber-600 mt-1">Admin role — full access while App access is Allowed</p>}
                     </td>
                   </tr>
                 ))}
@@ -243,7 +253,7 @@ export default function UserAccessPage() {
             </table>
           </div>
           <p className="px-4 py-3 text-xs text-slate-500 border-t border-slate-100">
-            No group = view only on Shipments, Receiving and Shipment Report. Blocked = can&apos;t sign in to Logistics. Changes apply on the user&apos;s next page load.
+            No group = view only on Shipments, Receiving and Shipment Report. Blocked = can&apos;t sign in to Logistics; only the Super Admin can change App access. Changes apply on the user&apos;s next page load.
           </p>
         </div>
       ) : (
