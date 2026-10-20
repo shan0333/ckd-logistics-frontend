@@ -154,7 +154,7 @@ export default function ReportFilters({ value, onChange, testIdPrefix, extra, ex
                     className={clsx('flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors',
                       on ? 'bg-blue-600 border-blue-600 text-white' : 'bg-white border-slate-300 text-slate-600 hover:border-slate-400')}>
                     <span className={clsx('w-2 h-2 rounded-full', on ? 'bg-white' : STATUS_DOT[s])} />
-                    {s}
+                    {s === 'OVER DUE' ? 'OVERDUE (incl. received late)' : s}
                   </button>
                 );
               })}

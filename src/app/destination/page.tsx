@@ -30,7 +30,8 @@ const STATUS_PILLS = [
   { label: 'In Transit', value: 'TRANSIT' },
   { label: 'Received', value: 'RECEIVED' },
   { label: 'Work In-Progress', value: 'WORK IN-PROGRESS' },
-  { label: 'Over Due', value: 'OVER DUE' },
+  // Overdue = ETA passed: not received yet, or received after the ETA date (backend filter)
+  { label: 'Overdue (incl. received late)', value: 'OVER DUE' },
   { label: 'Completed', value: 'COMPLETED' },
 ];
 
